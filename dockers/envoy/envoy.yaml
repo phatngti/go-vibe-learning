@@ -1,0 +1,389 @@
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+static_resources:
+  listeners:
+    - name: public_http
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8888
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: api_gateway
+                codec_type: AUTO
+                use_remote_address: true
+                route_config:
+                  name: public_routes
+                  virtual_hosts:
+                    - name: api_gateway
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            path: /
+                          redirect:
+                            path_redirect: /api/v1/swagger/
+                            response_code: MOVED_PERMANENTLY
+                          typed_per_filter_config: &disable_ext_authz
+                            envoy.filters.http.ext_authz:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+                              disabled: true
+                        - match:
+                            prefix: /api/v1/swagger/
+                          route:
+                            cluster: swagger_ui
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/swagger
+                          redirect:
+                            path_redirect: /api/v1/swagger/
+                            response_code: MOVED_PERMANENTLY
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/payment/initiate
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: payment_grpc
+                            timeout: 60s
+                        - match:
+                            prefix: /api/v1/payment/checkout/
+                          route:
+                            cluster: payment_grpc
+                            timeout: 60s
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/affiliate/referral/link
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: affiliate_grpc
+                            timeout: 60s
+                        - match:
+                            prefix: /api/v1/affiliate/rank/
+                          route:
+                            cluster: affiliate_grpc
+                            timeout: 60s
+                        - match:
+                            prefix: /api/v1/affiliate/downline/
+                          route:
+                            cluster: affiliate_grpc
+                            timeout: 60s
+                        - match:
+                            prefix: /api/v1/settlement/balance/
+                          route:
+                            cluster: settlement_grpc
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/settlement/withdraw
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: settlement_grpc
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/settlement/credit/limit
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: settlement_grpc
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/agent/config/callback
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: agent_grpc
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/agent/config/key/generate
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: agent_grpc
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/auth/login
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/auth/refresh
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: POST
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/auth/verify-token
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: GET
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/auth/info
+                            headers:
+                              - name: ":method"
+                                string_match:
+                                  exact: GET
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                        - match:
+                            prefix: /api/v1/auth/
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                        - match:
+                            prefix: /api/v1/author/
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                        - match:
+                            path: /api/v1/health
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1
+                          route:
+                            cluster: api_http
+                            timeout: 60s
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            prefix: /api/v1/
+                          direct_response:
+                            status: 404
+                            body:
+                              inline_string: '{"error":"route not found"}'
+                          typed_per_filter_config: *disable_ext_authz
+                http_filters:
+                  - name: envoy.filters.http.jwt_authn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                      providers:
+                        keycloak:
+                          issuer: http://localhost:8080/realms/backend
+                          from_headers:
+                            - name: Authorization
+                              value_prefix: "Bearer "
+                          remote_jwks:
+                            http_uri:
+                              uri: http://keycloak:8080/realms/backend/protocol/openid-connect/certs
+                              cluster: keycloak
+                              timeout: 5s
+                            cache_duration: 300s
+                          forward: false
+                          forward_payload_header: x-gateway-jwt-payload
+                          payload_in_metadata: verified_jwt
+                      rules:
+                        - match:
+                            prefix: /api/v1/swagger/
+                        - match:
+                            path: /api/v1/swagger
+                        - match:
+                            path: /api/v1/health
+                        - match:
+                            path: /api/v1
+                        - match:
+                            path: /api/v1/auth/login
+                        - match:
+                            path: /api/v1/auth/refresh
+                        - match:
+                            prefix: /api/v1/payment/checkout/
+                        - match:
+                            path: /api/v1/payment/initiate
+                          requires:
+                            provider_name: keycloak
+                        - match:
+                            prefix: /api/v1/affiliate/
+                          requires:
+                            provider_name: keycloak
+                        - match:
+                            prefix: /api/v1/settlement/
+                          requires:
+                            provider_name: keycloak
+                        - match:
+                            prefix: /api/v1/agent/
+                          requires:
+                            provider_name: keycloak
+                        - match:
+                            path: /api/v1/auth/verify-token
+                          requires:
+                            provider_name: keycloak
+                        - match:
+                            path: /api/v1/auth/info
+                          requires:
+                            provider_name: keycloak
+                        - match:
+                            prefix: /api/v1/author/
+                          requires:
+                            provider_name: keycloak
+                  - name: envoy.filters.http.ext_authz
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+                      failure_mode_allow: false
+                      http_service:
+                        server_uri:
+                          uri: http://host.docker.internal:8889
+                          cluster: api_http
+                          timeout: 0.5s
+                        path_prefix: /internal/ext-authz/check
+                        authorization_request:
+                          allowed_headers:
+                            patterns:
+                              - exact: x-gateway-jwt-payload
+                              - exact: x-request-id
+                              - exact: traceparent
+                              - exact: tracestate
+                  - name: envoy.filters.http.grpc_json_transcoder
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+                      proto_descriptor: /etc/envoy/proto.pb
+                      services:
+                        - payment.v1.PaymentService
+                        - affiliate.v1.AffiliateService
+                        - settlement.v1.SettlementService
+                        - agent.v1.AgentConfigService
+                      match_incoming_request_route: true
+                      convert_grpc_status: true
+                      print_options:
+                        add_whitespace: true
+                        always_print_primitive_fields: true
+                        always_print_enums_as_ints: false
+                        preserve_proto_field_names: true
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: api_http
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: api_http
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 8889
+    - name: swagger_ui
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: swagger_ui
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: swagger-ui
+                      port_value: 8080
+    - name: keycloak
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: keycloak
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: keycloak
+                      port_value: 8080
+    - name: payment_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: &http2_options
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: payment_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9081
+    - name: affiliate_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: *http2_options
+      load_assignment:
+        cluster_name: affiliate_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9082
+    - name: settlement_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: *http2_options
+      load_assignment:
+        cluster_name: settlement_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9083
+    - name: agent_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: *http2_options
+      load_assignment:
+        cluster_name: agent_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9084

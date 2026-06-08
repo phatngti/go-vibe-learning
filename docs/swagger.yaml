@@ -1,0 +1,969 @@
+basePath: /api/v1
+definitions:
+  domain.ResourceAccess:
+    properties:
+      resource_id:
+        type: string
+      resource_name:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+    type: object
+  domain.User:
+    properties:
+      aud:
+        type: string
+      email:
+        type: string
+      email_verified:
+        type: boolean
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      resource_access:
+        items:
+          $ref: '#/definitions/domain.ResourceAccess'
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
+      scope:
+        type: string
+      username:
+        type: string
+    type: object
+  dto.AdjustCreditLimit:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      limit:
+        example: 1000
+        type: number
+    type: object
+  dto.AgentConfigResponse:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      allowed_ips:
+        example: 127.0.0.1,10.0.0.1
+        type: string
+      api_key:
+        example: generated-key
+        type: string
+      callback_url:
+        example: https://merchant.example/callback
+        type: string
+      updated_at:
+        example: "2026-06-06T12:00:00+07:00"
+        type: string
+    type: object
+  dto.AuthnCheckDataDTO:
+    properties:
+      authenticated:
+        example: true
+        type: boolean
+      user:
+        $ref: '#/definitions/domain.User'
+    type: object
+  dto.AuthnCheckResponseDTO:
+    properties:
+      code:
+        example: authn_check_success
+        type: string
+      data:
+        $ref: '#/definitions/dto.AuthnCheckDataDTO'
+      message:
+        example: Authentication check success
+        type: string
+    type: object
+  dto.BalanceResponse:
+    properties:
+      active_balance:
+        example: 500
+        type: number
+      agent_id:
+        example: agent-123
+        type: string
+      credit_limit:
+        example: 1000
+        type: number
+      max_withdrawal:
+        example: 1500
+        type: number
+    type: object
+  dto.CheckRBACRequestDTO:
+    properties:
+      resource:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+    required:
+    - resource
+    type: object
+  dto.CheckoutPageResponse:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      amount:
+        example: 100.5
+        type: number
+      currency:
+        example: USD
+        type: string
+      help:
+        example: Submit a POST to this same URL with payment details to pay
+        type: string
+      message:
+        example: Welcome to Secure Checkout Page
+        type: string
+      status:
+        example: PENDING
+        type: string
+      transaction_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  dto.ConfigureCallback:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      allowed_ips:
+        items:
+          type: string
+        type: array
+      callback_url:
+        example: https://merchant.example/callback
+        type: string
+    type: object
+  dto.CreditLimitResponse:
+    properties:
+      active_balance:
+        example: 500
+        type: number
+      agent_id:
+        example: agent-123
+        type: string
+      credit_limit:
+        example: 1000
+        type: number
+    type: object
+  dto.DownlineResponse:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      referee_ids:
+        example:
+        - agent-456
+        - agent-789
+        items:
+          type: string
+        type: array
+      total_referrals:
+        example: 2
+        type: integer
+    type: object
+  dto.GenerateAPIKey:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+    type: object
+  dto.GenerateAPIKeyResponse:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      api_key:
+        example: generated-key
+        type: string
+    type: object
+  dto.InfoDataDTO:
+    properties:
+      info:
+        $ref: '#/definitions/gatewayauth.User'
+    type: object
+  dto.InfoResponseDTO:
+    properties:
+      code:
+        example: info_success
+        type: string
+      data:
+        $ref: '#/definitions/dto.InfoDataDTO'
+      message:
+        example: Info success
+        type: string
+    type: object
+  dto.InitiatePayment:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      amount:
+        example: 100.5
+        type: number
+      callback_url:
+        example: https://merchant.example/callback
+        type: string
+      currency:
+        example: USD
+        type: string
+      customer_id:
+        example: customer-123
+        type: string
+    type: object
+  dto.LoginRequestDTO:
+    properties:
+      password:
+        maxLength: 20
+        minLength: 6
+        type: string
+      username:
+        maxLength: 20
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  dto.LoginResponseDTO:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  dto.ProcessCheckoutRequest:
+    properties:
+      card_number:
+        example: "4111111111111111"
+        type: string
+      cvv:
+        example: "123"
+        type: string
+    type: object
+  dto.RBACCheckDataDTO:
+    properties:
+      allowed:
+        example: true
+        type: boolean
+      resource:
+        example: payment
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+    type: object
+  dto.RBACCheckResponseDTO:
+    properties:
+      code:
+        example: rbac_check_success
+        type: string
+      data:
+        $ref: '#/definitions/dto.RBACCheckDataDTO'
+      message:
+        example: RBAC check success
+        type: string
+    type: object
+  dto.RankResponse:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      current_rank:
+        example: BRONZE
+        type: string
+      referrals:
+        example: 3
+        type: integer
+      total_volume:
+        example: 2500
+        type: number
+    type: object
+  dto.RefreshTokenRequestDTO:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.RegisterReferral:
+    properties:
+      referee_id:
+        example: agent-456
+        type: string
+      referrer_id:
+        example: agent-123
+        type: string
+    type: object
+  dto.RegisterReferralResponse:
+    properties:
+      status:
+        example: linked
+        type: string
+    type: object
+  dto.RequestWithdrawal:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      amount:
+        example: 100
+        type: number
+    type: object
+  dto.TransactionResponse:
+    properties:
+      agent_id:
+        example: agent-123
+        type: string
+      amount:
+        example: 100.5
+        type: number
+      callback_url:
+        example: https://merchant.example/callback
+        type: string
+      created_at:
+        example: "2026-06-06T12:00:00+07:00"
+        type: string
+      currency:
+        example: USD
+        type: string
+      customer_id:
+        example: customer-123
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      status:
+        example: PENDING
+        type: string
+      updated_at:
+        example: "2026-06-06T12:00:00+07:00"
+        type: string
+    type: object
+  dto.VerifyTokenResponseDTO:
+    properties:
+      valid:
+        type: boolean
+    type: object
+  dto.WithdrawalResponse:
+    properties:
+      active_balance:
+        example: 400
+        type: number
+      agent_id:
+        example: agent-123
+        type: string
+      amount:
+        example: 100
+        type: number
+      status:
+        example: SUCCESS
+        type: string
+    type: object
+  gatewayauth.ResourceAccess:
+    properties:
+      resource_id:
+        type: string
+      resource_name:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+    type: object
+  gatewayauth.User:
+    properties:
+      aud:
+        type: string
+      email:
+        type: string
+      email_verified:
+        type: boolean
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      resource_access:
+        items:
+          $ref: '#/definitions/gatewayauth.ResourceAccess'
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
+      scope:
+        type: string
+      username:
+        type: string
+    type: object
+  response.ErrorDetails:
+    properties:
+      code:
+        type: string
+      data: {}
+      message:
+        type: string
+    type: object
+  response.ErrorResponse:
+    properties:
+      code:
+        type: string
+      errors:
+        items:
+          $ref: '#/definitions/response.ErrorDetails'
+        type: array
+      message:
+        type: string
+    type: object
+host: localhost:8889
+info:
+  contact: {}
+  description: HTTP API and service route documentation generated from DTO-backed
+    handlers.
+  title: Master Go CQRS API
+  version: "2.0"
+paths:
+  /affiliate/downline/{id}:
+    get:
+      description: Return all direct referee IDs for an agent.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DownlineResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get affiliate downline
+      tags:
+      - affiliate
+  /affiliate/rank/{id}:
+    get:
+      description: Return rank and volume metrics for an agent.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RankResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get affiliate rank
+      tags:
+      - affiliate
+  /affiliate/referral/link:
+    post:
+      consumes:
+      - application/json
+      description: Create a referral link between a referrer and referee.
+      parameters:
+      - description: Referral payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterReferral'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RegisterReferralResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Link affiliate referral
+      tags:
+      - affiliate
+  /agent/config/callback:
+    post:
+      consumes:
+      - application/json
+      description: Update callback URL and allowed IPs for an agent.
+      parameters:
+      - description: Callback configuration payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ConfigureCallback'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AgentConfigResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Configure agent callback
+      tags:
+      - agent
+  /agent/config/key/generate:
+    post:
+      consumes:
+      - application/json
+      description: Generate and persist a new API key for an agent.
+      parameters:
+      - description: API key generation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GenerateAPIKey'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GenerateAPIKeyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Generate agent API key
+      tags:
+      - agent
+  /auth/info:
+    get:
+      description: Return authenticated user claims and permissions.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User info
+          schema:
+            $ref: '#/definitions/dto.InfoResponseDTO'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user info
+      tags:
+      - authentication
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with username and password.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: loginRequest
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            $ref: '#/definitions/dto.LoginResponseDTO'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: User Login
+      tags:
+      - authentication
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh the authentication token.
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: refreshRequest
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshTokenRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Refresh successful
+          schema:
+            $ref: '#/definitions/dto.LoginResponseDTO'
+        "401":
+          description: Invalid refresh token
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Refresh access token
+      tags:
+      - authentication
+  /auth/verify-token:
+    get:
+      consumes:
+      - application/json
+      description: Verify the authentication token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Verify token successful
+          schema:
+            $ref: '#/definitions/dto.VerifyTokenResponseDTO'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Verify token
+      tags:
+      - authentication
+  /author/authn/check:
+    get:
+      description: Return authenticated user details for a valid bearer token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuthnCheckResponseDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Check authentication
+      tags:
+      - access-control
+  /author/rbac/check:
+    post:
+      consumes:
+      - application/json
+      description: Check whether the authenticated user has all requested scopes on
+        a resource.
+      parameters:
+      - description: RBAC check payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CheckRBACRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RBACCheckResponseDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.RBACCheckResponseDTO'
+      security:
+      - BearerAuth: []
+      summary: Check RBAC
+      tags:
+      - access-control
+  /payment/checkout/{id}:
+    get:
+      description: Return public checkout details for a transaction.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CheckoutPageResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get checkout transaction
+      tags:
+      - payment
+    post:
+      consumes:
+      - application/json
+      description: Process a public checkout payment for an existing transaction.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Checkout card payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ProcessCheckoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Process checkout payment
+      tags:
+      - payment
+  /payment/initiate:
+    post:
+      consumes:
+      - application/json
+      description: Create a payment transaction and return checkout details.
+      parameters:
+      - description: Payment initiation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.InitiatePayment'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Initiate payment
+      tags:
+      - payment
+  /settlement/balance/{id}:
+    get:
+      description: Return active balance, credit limit, and maximum withdrawal for
+        an agent.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.BalanceResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get settlement balance
+      tags:
+      - settlement
+  /settlement/credit/limit:
+    post:
+      consumes:
+      - application/json
+      description: Update an agent credit limit.
+      parameters:
+      - description: Credit limit payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdjustCreditLimit'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CreditLimitResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Adjust settlement credit limit
+      tags:
+      - settlement
+  /settlement/withdraw:
+    post:
+      consumes:
+      - application/json
+      description: Request a withdrawal from an agent balance.
+      parameters:
+      - description: Withdrawal payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RequestWithdrawal'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WithdrawalResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "412":
+          description: Precondition Failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Request settlement withdrawal
+      tags:
+      - settlement
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

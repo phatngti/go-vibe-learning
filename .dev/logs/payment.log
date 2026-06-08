@@ -1,0 +1,129 @@
+[Fx] PROVIDE	fx.Lifecycle <= go.uber.org/fx.New.func1()
+[Fx] PROVIDE	fx.Shutdowner <= go.uber.org/fx.(*App).shutdowner-fm()
+[Fx] PROVIDE	fx.DotGraph <= go.uber.org/fx.(*App).dotGraph-fm()
+[Fx] PROVIDE	*grpc.Server <= github/master_go_cqrs/internal/platform/grpc.NewServer()
+[Fx] PROVIDE	*grpc.Server <= github/master_go_cqrs/internal/platform/grpc.ProvideRawServer()
+[Fx] PROVIDE	*config.Config <= github/master_go_cqrs/internal/config.NewConfig() from module "config"
+[Fx] PROVIDE	logger.Factory <= github/master_go_cqrs/internal/observability/logger.New() from module "logger"
+[Fx] PROVIDE	*postgres.DB <= github/master_go_cqrs/internal/platform/postgres.New() from module "postgres"
+[Fx] PROVIDE	gatewayauth.Middleware <= github/master_go_cqrs/internal/security/gatewayauth.NewMiddleware() from module "gatewayauth"
+[Fx] PROVIDE	outbox.Repository <= github/master_go_cqrs/internal/platform/outbox.init.func1() from module "outbox"
+[Fx] PROVIDE	*outbox.Publisher <= github/master_go_cqrs/internal/platform/outbox.NewPublisher() from module "outbox"
+[Fx] PROVIDE	client.Client <= github/master_go_cqrs/internal/platform/temporal.NewClient() from module "temporal"
+[Fx] PROVIDE	domain.TransactionRepository <= github/master_go_cqrs/internal/payment/repository/postgres.NewTransactionRepository() from module "payment"
+[Fx] PROVIDE	domain.PaymentGateway <= github/master_go_cqrs/internal/payment/gateway/simulator.NewSimulatorGateway() from module "payment"
+[Fx] PROVIDE	*command.InitiatePaymentHandler <= github/master_go_cqrs/internal/payment/application/command.NewInitiatePaymentHandler() from module "payment"
+[Fx] PROVIDE	*command.ProcessPaymentHandler <= github/master_go_cqrs/internal/payment/application/command.NewProcessPaymentHandler() from module "payment"
+[Fx] PROVIDE	*query.GetTransactionHandler <= github/master_go_cqrs/internal/payment/application/query.NewGetTransactionHandler() from module "payment"
+[Fx] PROVIDE	route.Registrar[group = "routes"] <= fx.Annotate(github/master_go_cqrs/internal/payment/delivery/http.NewHandler(), fx.ResultTags(["group:\"routes\""]), fx.As([[route.Registrar]]) from module "payment"
+[Fx] PROVIDE	*grpc.ServerHandler <= github/master_go_cqrs/internal/payment/delivery/grpc.NewServerHandler() from module "payment"
+[Fx] PROVIDE	*httpapi.Server <= github/master_go_cqrs/internal/httpapi.NewServer() from module "httpapi"
+[Fx] INVOKE		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle() from module "telemetry"
+[Fx] BEFORE RUN	provide: go.uber.org/fx.New.func1()
+[Fx] RUN	provide: go.uber.org/fx.New.func1() in 3.167µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/config.NewConfig() from module "config"
+[Fx] RUN	provide: github/master_go_cqrs/internal/config.NewConfig() in 141µs from module "config"
+[Fx] INVOKE		github/master_go_cqrs/internal/platform/outbox.init.func2() from module "outbox"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/observability/logger.New() from module "logger"
+[Fx] RUN	provide: github/master_go_cqrs/internal/observability/logger.New() in 34.459µs from module "logger"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/postgres.New() from module "postgres"
+2026-06-07T23:46:13.011+0700	[34mINFO[0m	postgres/postgres.go:28	[34mCreating Postgres connection[0m
+2026-06-07T23:46:13.019+0700	[34mINFO[0m	postgres/postgres.go:75	[34mConnected to Postgres database[0m
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/postgres.New() in 7.90925ms from module "postgres"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/outbox.init.func1() from module "outbox"
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/outbox.init.func1() in 6.417µs from module "outbox"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/temporal.NewClient() from module "temporal"
+2026-06-07T23:46:13.019+0700	[34mINFO[0m	temporal/temporal.go:20	[34mConnecting to Temporal Server%!(EXTRA zapcore.Field={endpoint 15 0 localhost:4318 <nil>})[0m
+2026/06/07 23:46:13 INFO  No logger configured for temporal client. Created default one.
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/temporal.NewClient() in 69.192125ms from module "temporal"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/outbox.NewPublisher() from module "outbox"
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/outbox.NewPublisher() in 5.625µs from module "outbox"
+[Fx] INVOKE		github/master_go_cqrs/internal/payment/delivery/grpc.RequireServerHandler() from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/grpc.NewServer()
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/grpc.NewServer() in 62.792µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/grpc.ProvideRawServer()
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/grpc.ProvideRawServer() in 1.875µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/payment/repository/postgres.NewTransactionRepository() from module "payment"
+[Fx] RUN	provide: github/master_go_cqrs/internal/payment/repository/postgres.NewTransactionRepository() in 1.458µs from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/payment/application/command.NewInitiatePaymentHandler() from module "payment"
+[Fx] RUN	provide: github/master_go_cqrs/internal/payment/application/command.NewInitiatePaymentHandler() in 1.5µs from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/payment/gateway/simulator.NewSimulatorGateway() from module "payment"
+[Fx] RUN	provide: github/master_go_cqrs/internal/payment/gateway/simulator.NewSimulatorGateway() in 1.375µs from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/payment/application/command.NewProcessPaymentHandler() from module "payment"
+[Fx] RUN	provide: github/master_go_cqrs/internal/payment/application/command.NewProcessPaymentHandler() in 2.875µs from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/payment/application/query.NewGetTransactionHandler() from module "payment"
+[Fx] RUN	provide: github/master_go_cqrs/internal/payment/application/query.NewGetTransactionHandler() in 1.708µs from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/payment/delivery/grpc.NewServerHandler() from module "payment"
+[Fx] RUN	provide: github/master_go_cqrs/internal/payment/delivery/grpc.NewServerHandler() in 6.25µs from module "payment"
+[Fx] INVOKE		github/master_go_cqrs/internal/httpapi.RequireServer() from module "httpapi"
+[Fx] BEFORE RUN	provide: go.uber.org/fx.(*App).shutdowner-fm()
+[Fx] RUN	provide: go.uber.org/fx.(*App).shutdowner-fm() in 1.5µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/security/gatewayauth.NewMiddleware() from module "gatewayauth"
+[Fx] RUN	provide: github/master_go_cqrs/internal/security/gatewayauth.NewMiddleware() in 1.167µs from module "gatewayauth"
+[Fx] BEFORE RUN	provide: fx.Annotate(github/master_go_cqrs/internal/payment/delivery/http.NewHandler(), fx.ResultTags(["group:\"routes\""]), fx.As([[route.Registrar]]) from module "payment"
+[Fx] RUN	provide: fx.Annotate(github/master_go_cqrs/internal/payment/delivery/http.NewHandler(), fx.ResultTags(["group:\"routes\""]), fx.As([[route.Registrar]]) in 21.25µs from module "payment"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/httpapi.NewServer() from module "httpapi"
+[Fx] RUN	provide: github/master_go_cqrs/internal/httpapi.NewServer() in 82.834µs from module "httpapi"
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func1() executing (caller: github/master_go_cqrs/internal/observability/telemetry.registerLifecycle)
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func1() called by github/master_go_cqrs/internal/observability/telemetry.registerLifecycle ran successfully in 457.666µs
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start.func1() executing (caller: github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start)
+2026-06-07T23:46:13.089+0700	[34mINFO[0m	outbox/publisher.go:33	[34mStarting Outbox Event Publisher background worker[0m
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start.func1() called by github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start ran successfully in 22.917µs
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/platform/grpc.NewServer.func1() executing (caller: github/master_go_cqrs/internal/platform/grpc.NewServer)
+2026-06-07T23:46:13.089+0700	[34mINFO[0m	grpc/server.go:46	[34mStarting gRPC server%!(EXTRA zapcore.Field={addr 15 0 :9081 <nil>})[0m
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/platform/grpc.NewServer.func1() called by github/master_go_cqrs/internal/platform/grpc.NewServer ran successfully in 83µs
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/httpapi.(*Server).Start-fm() executing (caller: github/master_go_cqrs/internal/httpapi.NewServer)
+2026-06-07T23:46:13.089+0700	[34mINFO[0m	httpapi/server.go:147	[34mStarting Echo server on address: [::]:8081[0m
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/httpapi.(*Server).Start-fm() called by github/master_go_cqrs/internal/httpapi.NewServer ran successfully in 45.25µs
+[Fx] RUNNING
+
+   ____    __
+  / __/___/ /  ___
+ / _// __/ _ \/ _ \
+/___/\__/_//_/\___/ v4.13.4
+High performance, minimalist Go web framework
+https://echo.labstack.com
+____________________________________O/_______
+                                    O\
+⇨ http server started on [::]:8081
+
+2026/06/08 00:17:33 [31;1m/Volumes/WD850X/Users/workspace/roadmap/master_go_cqrs/internal/platform/outbox/repository.go:56 [35;1mread tcp 127.0.0.1:51206->127.0.0.1:15432: read: connection reset by peer
+[0m[33m[0.228ms] [34;1m[rows:0][0m SELECT * FROM "public"."outbox_events" WHERE status = 'PENDING' ORDER BY created_at asc LIMIT 20
+2026-06-08T00:17:33.101+0700	[38;5;208mERROR[0m	outbox/publisher.go:63	[38;5;208mFailed to fetch pending outbox events%!(EXTRA zapcore.Field={error 26 0  failed to query pending outbox events: read tcp 127.0.0.1:51206->127.0.0.1:15432: read: connection reset by peer})[0m
+
+2026/06/08 00:17:34 [31;1m/Volumes/WD850X/Users/workspace/roadmap/master_go_cqrs/internal/platform/outbox/repository.go:56 [35;1mfailed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)
+[0m[33m[0.512ms] [34;1m[rows:0][0m SELECT * FROM "public"."outbox_events" WHERE status = 'PENDING' ORDER BY created_at asc LIMIT 20
+2026-06-08T00:17:34.101+0700	[38;5;208mERROR[0m	outbox/publisher.go:63	[38;5;208mFailed to fetch pending outbox events%!(EXTRA zapcore.Field={error 26 0  failed to query pending outbox events: failed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)})[0m
+
+2026/06/08 00:17:35 [31;1m/Volumes/WD850X/Users/workspace/roadmap/master_go_cqrs/internal/platform/outbox/repository.go:56 [35;1mfailed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)
+[0m[33m[0.463ms] [34;1m[rows:0][0m SELECT * FROM "public"."outbox_events" WHERE status = 'PENDING' ORDER BY created_at asc LIMIT 20
+2026-06-08T00:17:35.101+0700	[38;5;208mERROR[0m	outbox/publisher.go:63	[38;5;208mFailed to fetch pending outbox events%!(EXTRA zapcore.Field={error 26 0  failed to query pending outbox events: failed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)})[0m
+
+2026/06/08 00:17:37 [31;1m/Volumes/WD850X/Users/workspace/roadmap/master_go_cqrs/internal/platform/outbox/repository.go:56 [35;1mfailed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)
+[0m[33m[0.170ms] [34;1m[rows:0][0m SELECT * FROM "public"."outbox_events" WHERE status = 'PENDING' ORDER BY created_at asc LIMIT 20
+2026-06-08T00:17:37.139+0700	[38;5;208mERROR[0m	outbox/publisher.go:63	[38;5;208mFailed to fetch pending outbox events%!(EXTRA zapcore.Field={error 26 0  failed to query pending outbox events: failed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)})[0m
+
+2026/06/08 00:17:38 [31;1m/Volumes/WD850X/Users/workspace/roadmap/master_go_cqrs/internal/platform/outbox/repository.go:56 [35;1mfailed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)
+[0m[33m[0.413ms] [34;1m[rows:0][0m SELECT * FROM "public"."outbox_events" WHERE status = 'PENDING' ORDER BY created_at asc LIMIT 20
+2026-06-08T00:17:38.101+0700	[38;5;208mERROR[0m	outbox/publisher.go:63	[38;5;208mFailed to fetch pending outbox events%!(EXTRA zapcore.Field={error 26 0  failed to query pending outbox events: failed to connect to `host=127.0.0.1 user=master_go_cqrs_payment_user database=master_go_cqrs_payment`: dial error (dial tcp 127.0.0.1:15432: connect: connection refused)})[0m
+[Fx] TERMINATED
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/httpapi.(*Server).Stop-fm() executing (caller: github/master_go_cqrs/internal/httpapi.NewServer)
+2026-06-08T00:17:38.334+0700	[34mINFO[0m	httpapi/server.go:160	[34mInitiating graceful shutdown of the server[0m
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	httpapi/server.go:165	[34mServer shutdown completed[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/httpapi.(*Server).Stop-fm() called by github/master_go_cqrs/internal/httpapi.NewServer ran successfully in 470.875µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/grpc.NewServer.func2() executing (caller: github/master_go_cqrs/internal/platform/grpc.NewServer)
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	grpc/server.go:55	[34mStopping gRPC server gracefully[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/grpc.NewServer.func2() called by github/master_go_cqrs/internal/platform/grpc.NewServer ran successfully in 139.75µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start.func2() executing (caller: github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start)
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	outbox/publisher.go:38	[34mStopping Outbox Event Publisher background worker[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start.func2() called by github/master_go_cqrs/internal/platform/outbox.(*Publisher).Start ran successfully in 72.291µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/temporal.NewClient.func1() executing (caller: github/master_go_cqrs/internal/platform/temporal.NewClient)
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	temporal/temporal.go:38	[34mClosing Temporal client connection[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/temporal.NewClient.func1() called by github/master_go_cqrs/internal/platform/temporal.NewClient ran successfully in 76.917µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/postgres.New.func1() executing (caller: github/master_go_cqrs/internal/platform/postgres.New)
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	postgres/postgres.go:84	[34mClosing Postgres connection[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/postgres.New.func1() called by github/master_go_cqrs/internal/platform/postgres.New ran successfully in 35.75µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/logger.New.func1() executing (caller: github/master_go_cqrs/internal/observability/logger.New)
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/logger.New.func1() called by github/master_go_cqrs/internal/observability/logger.New ran successfully in 4.581333ms
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func2() executing (caller: github/master_go_cqrs/internal/observability/telemetry.registerLifecycle)
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func2() called by github/master_go_cqrs/internal/observability/telemetry.registerLifecycle ran successfully in 80.583µs

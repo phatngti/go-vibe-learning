@@ -1,0 +1,26 @@
+postgres:
+  host: "127.0.0.1"
+  port: "15432"
+  user: "master_go_cqrs_settlement_user"
+  password: "master_go_cqrs_settlement_password"
+  dbname: "master_go_cqrs_settlement"
+
+logger:
+  logLevel: "debug"
+  mode: "development"
+  encoding: "console"
+
+server:
+  port: 8083
+
+keycloak:
+  endpoint: "http://localhost:8080"
+  clientId: "master-go-cqrs"
+  clientSecret: "master_go_cqrs_secret"
+  publicKey: ""
+  customHeaderName: "Authorization"
+  realm: "backend"
+
+otel:
+  endpoint: "localhost:4318"
+  service: "settlement"

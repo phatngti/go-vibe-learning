@@ -1,0 +1,88 @@
+[Fx] PROVIDE	fx.Lifecycle <= go.uber.org/fx.New.func1()
+[Fx] PROVIDE	fx.Shutdowner <= go.uber.org/fx.(*App).shutdowner-fm()
+[Fx] PROVIDE	fx.DotGraph <= go.uber.org/fx.(*App).dotGraph-fm()
+[Fx] PROVIDE	*grpc.Server <= github/master_go_cqrs/internal/platform/grpc.NewServer()
+[Fx] PROVIDE	*grpc.Server <= github/master_go_cqrs/internal/platform/grpc.ProvideRawServer()
+[Fx] PROVIDE	*config.Config <= github/master_go_cqrs/internal/config.NewConfig() from module "config"
+[Fx] PROVIDE	logger.Factory <= github/master_go_cqrs/internal/observability/logger.New() from module "logger"
+[Fx] PROVIDE	*postgres.DB <= github/master_go_cqrs/internal/platform/postgres.New() from module "postgres"
+[Fx] PROVIDE	gatewayauth.Middleware <= github/master_go_cqrs/internal/security/gatewayauth.NewMiddleware() from module "gatewayauth"
+[Fx] PROVIDE	domain.AffiliateRepository <= github/master_go_cqrs/internal/affiliate/repository/postgres.NewAffiliateRepository() from module "affiliate"
+[Fx] PROVIDE	*command.RegisterReferralHandler <= github/master_go_cqrs/internal/affiliate/application/command.NewRegisterReferralHandler() from module "affiliate"
+[Fx] PROVIDE	*command.AccumulateVolumeHandler <= github/master_go_cqrs/internal/affiliate/application/command.NewAccumulateVolumeHandler() from module "affiliate"
+[Fx] PROVIDE	*query.GetRankHandler <= github/master_go_cqrs/internal/affiliate/application/query.NewGetRankHandler() from module "affiliate"
+[Fx] PROVIDE	*query.GetDownlineHandler <= github/master_go_cqrs/internal/affiliate/application/query.NewGetDownlineHandler() from module "affiliate"
+[Fx] PROVIDE	route.Registrar[group = "routes"] <= fx.Annotate(github/master_go_cqrs/internal/affiliate/delivery/http.NewHandler(), fx.ResultTags(["group:\"routes\""]), fx.As([[route.Registrar]]) from module "affiliate"
+[Fx] PROVIDE	*grpc.ServerHandler <= github/master_go_cqrs/internal/affiliate/delivery/grpc.NewServerHandler() from module "affiliate"
+[Fx] PROVIDE	*httpapi.Server <= github/master_go_cqrs/internal/httpapi.NewServer() from module "httpapi"
+[Fx] INVOKE		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle() from module "telemetry"
+[Fx] BEFORE RUN	provide: go.uber.org/fx.New.func1()
+[Fx] RUN	provide: go.uber.org/fx.New.func1() in 2.459µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/config.NewConfig() from module "config"
+[Fx] RUN	provide: github/master_go_cqrs/internal/config.NewConfig() in 267.5µs from module "config"
+[Fx] INVOKE		github/master_go_cqrs/internal/affiliate/delivery/grpc.RequireServerHandler() from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/observability/logger.New() from module "logger"
+[Fx] RUN	provide: github/master_go_cqrs/internal/observability/logger.New() in 37.5µs from module "logger"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/grpc.NewServer()
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/grpc.NewServer() in 34.291µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/grpc.ProvideRawServer()
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/grpc.ProvideRawServer() in 1.042µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/platform/postgres.New() from module "postgres"
+2026-06-07T23:46:13.669+0700	[34mINFO[0m	postgres/postgres.go:28	[34mCreating Postgres connection[0m
+2026-06-07T23:46:13.678+0700	[34mINFO[0m	postgres/postgres.go:75	[34mConnected to Postgres database[0m
+[Fx] RUN	provide: github/master_go_cqrs/internal/platform/postgres.New() in 9.753792ms from module "postgres"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/affiliate/repository/postgres.NewAffiliateRepository() from module "affiliate"
+[Fx] RUN	provide: github/master_go_cqrs/internal/affiliate/repository/postgres.NewAffiliateRepository() in 7.833µs from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/affiliate/application/command.NewRegisterReferralHandler() from module "affiliate"
+[Fx] RUN	provide: github/master_go_cqrs/internal/affiliate/application/command.NewRegisterReferralHandler() in 2.75µs from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/affiliate/application/command.NewAccumulateVolumeHandler() from module "affiliate"
+[Fx] RUN	provide: github/master_go_cqrs/internal/affiliate/application/command.NewAccumulateVolumeHandler() in 3.167µs from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/affiliate/application/query.NewGetRankHandler() from module "affiliate"
+[Fx] RUN	provide: github/master_go_cqrs/internal/affiliate/application/query.NewGetRankHandler() in 2.083µs from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/affiliate/application/query.NewGetDownlineHandler() from module "affiliate"
+[Fx] RUN	provide: github/master_go_cqrs/internal/affiliate/application/query.NewGetDownlineHandler() in 1.041µs from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/affiliate/delivery/grpc.NewServerHandler() from module "affiliate"
+[Fx] RUN	provide: github/master_go_cqrs/internal/affiliate/delivery/grpc.NewServerHandler() in 18.5µs from module "affiliate"
+[Fx] INVOKE		github/master_go_cqrs/internal/httpapi.RequireServer() from module "httpapi"
+[Fx] BEFORE RUN	provide: go.uber.org/fx.(*App).shutdowner-fm()
+[Fx] RUN	provide: go.uber.org/fx.(*App).shutdowner-fm() in 1.667µs
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/security/gatewayauth.NewMiddleware() from module "gatewayauth"
+[Fx] RUN	provide: github/master_go_cqrs/internal/security/gatewayauth.NewMiddleware() in 1.166µs from module "gatewayauth"
+[Fx] BEFORE RUN	provide: fx.Annotate(github/master_go_cqrs/internal/affiliate/delivery/http.NewHandler(), fx.ResultTags(["group:\"routes\""]), fx.As([[route.Registrar]]) from module "affiliate"
+[Fx] RUN	provide: fx.Annotate(github/master_go_cqrs/internal/affiliate/delivery/http.NewHandler(), fx.ResultTags(["group:\"routes\""]), fx.As([[route.Registrar]]) in 12.375µs from module "affiliate"
+[Fx] BEFORE RUN	provide: github/master_go_cqrs/internal/httpapi.NewServer() from module "httpapi"
+[Fx] RUN	provide: github/master_go_cqrs/internal/httpapi.NewServer() in 92.333µs from module "httpapi"
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func1() executing (caller: github/master_go_cqrs/internal/observability/telemetry.registerLifecycle)
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func1() called by github/master_go_cqrs/internal/observability/telemetry.registerLifecycle ran successfully in 761.25µs
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/platform/grpc.NewServer.func1() executing (caller: github/master_go_cqrs/internal/platform/grpc.NewServer)
+2026-06-07T23:46:13.680+0700	[34mINFO[0m	grpc/server.go:46	[34mStarting gRPC server%!(EXTRA zapcore.Field={addr 15 0 :9082 <nil>})[0m
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/platform/grpc.NewServer.func1() called by github/master_go_cqrs/internal/platform/grpc.NewServer ran successfully in 141.292µs
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/httpapi.(*Server).Start-fm() executing (caller: github/master_go_cqrs/internal/httpapi.NewServer)
+2026-06-07T23:46:13.680+0700	[34mINFO[0m	httpapi/server.go:147	[34mStarting Echo server on address: [::]:8082[0m
+[Fx] HOOK OnStart		github/master_go_cqrs/internal/httpapi.(*Server).Start-fm() called by github/master_go_cqrs/internal/httpapi.NewServer ran successfully in 45.042µs
+[Fx] RUNNING
+
+   ____    __
+  / __/___/ /  ___
+ / _// __/ _ \/ _ \
+/___/\__/_//_/\___/ v4.13.4
+High performance, minimalist Go web framework
+https://echo.labstack.com
+____________________________________O/_______
+                                    O\
+⇨ http server started on [::]:8082
+[Fx] TERMINATED
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/httpapi.(*Server).Stop-fm() executing (caller: github/master_go_cqrs/internal/httpapi.NewServer)
+2026-06-08T00:17:38.334+0700	[34mINFO[0m	httpapi/server.go:160	[34mInitiating graceful shutdown of the server[0m
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	httpapi/server.go:165	[34mServer shutdown completed[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/httpapi.(*Server).Stop-fm() called by github/master_go_cqrs/internal/httpapi.NewServer ran successfully in 362.709µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/postgres.New.func1() executing (caller: github/master_go_cqrs/internal/platform/postgres.New)
+2026-06-08T00:17:38.335+0700	[34mINFO[0m	postgres/postgres.go:84	[34mClosing Postgres connection[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/postgres.New.func1() called by github/master_go_cqrs/internal/platform/postgres.New ran successfully in 683.541µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/grpc.NewServer.func2() executing (caller: github/master_go_cqrs/internal/platform/grpc.NewServer)
+2026-06-08T00:17:38.340+0700	[34mINFO[0m	grpc/server.go:55	[34mStopping gRPC server gracefully[0m
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/platform/grpc.NewServer.func2() called by github/master_go_cqrs/internal/platform/grpc.NewServer ran successfully in 171.792µs
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/logger.New.func1() executing (caller: github/master_go_cqrs/internal/observability/logger.New)
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/logger.New.func1() called by github/master_go_cqrs/internal/observability/logger.New ran successfully in 4.431ms
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func2() executing (caller: github/master_go_cqrs/internal/observability/telemetry.registerLifecycle)
+[Fx] HOOK OnStop		github/master_go_cqrs/internal/observability/telemetry.registerLifecycle.func2() called by github/master_go_cqrs/internal/observability/telemetry.registerLifecycle ran successfully in 79.458µs

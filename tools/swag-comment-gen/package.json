@@ -1,0 +1,152 @@
+{
+  "name": "swag-comment-gen",
+  "displayName": "Swag Comment Generator",
+  "version": "2.0.0",
+  "description": "Auto-generate all Swaggo (Swagger 2.0) Declarative Comments Format annotations for Go HTTP handlers — supports Echo, Gin, stdlib, and Chi frameworks",
+  "publisher": "master-go-cqrs",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Snippets",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "go",
+    "golang",
+    "swagger",
+    "swaggo",
+    "swag",
+    "openapi",
+    "echo",
+    "documentation",
+    "annotation"
+  ],
+  "activationEvents": [
+    "onLanguage:go"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "swagCommentGen.generate",
+        "title": "Swag: Generate Swagger Comment",
+        "category": "Swag"
+      },
+      {
+        "command": "swagCommentGen.generateEmpty",
+        "title": "Swag: Generate Empty Swagger Template",
+        "category": "Swag"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "swagCommentGen.generate",
+        "key": "ctrl+shift+alt+s",
+        "mac": "cmd+shift+alt+s",
+        "when": "editorLangId == go"
+      }
+    ],
+    "configuration": {
+      "title": "Swag Comment Generator",
+      "properties": {
+        "swagCommentGen.triggerPrefix": {
+          "type": "string",
+          "default": "/genswagger",
+          "description": "The slash command prefix that triggers generation"
+        },
+        "swagCommentGen.defaultTag": {
+          "type": "string",
+          "default": "",
+          "description": "Default @Tags value. Leave empty to auto-detect from package path."
+        },
+        "swagCommentGen.useTabAlignment": {
+          "type": "boolean",
+          "default": true,
+          "description": "Align Swaggo annotation columns with tabs (matches swag fmt output)"
+        },
+        "swagCommentGen.defaultErrorType": {
+          "type": "string",
+          "default": "response.ErrorResponse",
+          "description": "Default type used for @Failure responses"
+        },
+        "swagCommentGen.includeSecurity": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-include @Security when auth middleware is detected"
+        },
+        "swagCommentGen.securityScheme": {
+          "type": "string",
+          "default": "BearerAuth",
+          "description": "Security scheme name for @Security annotation"
+        },
+        "swagCommentGen.includeAccept": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add @Accept json for POST/PUT/PATCH handlers"
+        },
+        "swagCommentGen.includeGodocHeader": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include // funcName godoc header line"
+        },
+        "swagCommentGen.postSuccessCode": {
+          "type": "string",
+          "default": "201",
+          "enum": ["200", "201", "202"],
+          "description": "Default success HTTP status code for POST handlers"
+        },
+        "swagCommentGen.includeOperationId": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-generate @ID (operation ID) from function name"
+        },
+        "swagCommentGen.defaultProduceType": {
+          "type": "string",
+          "default": "json",
+          "enum": ["json", "xml", "plain", "html"],
+          "description": "Default @Produce MIME type for responses"
+        },
+        "swagCommentGen.defaultAcceptType": {
+          "type": "string",
+          "default": "json",
+          "enum": ["json", "xml"],
+          "description": "Default @Accept MIME type for request bodies"
+        },
+        "swagCommentGen.extensions": {
+          "type": "object",
+          "default": {},
+          "description": "Custom @x-{name} extension annotations (key-value pairs). Example: {\"order\": \"1\", \"deprecated-at\": \"2024-01-01\"}",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "swagCommentGen.operationIdStyle": {
+          "type": "string",
+          "default": "camelCase",
+          "enum": ["camelCase", "kebab-case", "PascalCase"],
+          "description": "Naming style for auto-generated @ID values"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "npx @vscode/vsce package --allow-missing-repository --baseContentUrl .",
+    "publish": "npx @vscode/vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "@types/mocha": "^10.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0",
+    "mocha": "^10.2.0"
+  }
+}

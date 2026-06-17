@@ -1,46 +1,58 @@
 package orchestrator
 
 import (
-	"context"
+	"time"
 
+	"github/master_go_cqrs/internal/config"
 	"github/master_go_cqrs/internal/observability/logger"
-	"github/master_go_cqrs/internal/orchestrator/activities"
-	"github/master_go_cqrs/internal/orchestrator/workflows"
+	"github/master_go_cqrs/internal/observability/telemetry"
+	"github/master_go_cqrs/internal/orchestrator/features/payment/codec"
+	paymentsaga "github/master_go_cqrs/internal/orchestrator/features/payment/saga"
+	paymentpostgres "github/master_go_cqrs/internal/orchestrator/features/payment/saga/repository/postgres"
+	temporalengine "github/master_go_cqrs/internal/orchestrator/features/payment/temporal"
+	"github/master_go_cqrs/internal/platform/inbox"
+	"github/master_go_cqrs/internal/platform/kafka"
+	"github/master_go_cqrs/internal/platform/outbox"
+	platformpostgres "github/master_go_cqrs/internal/platform/postgres"
 
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/worker"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
-var Module = fx.Module("orchestrator",
+const lifecycleTimeout = 30 * time.Second
+
+var SagaModule = fx.Module("orchestrator-saga",
 	fx.Provide(
-		activities.NewActivities,
+		codec.NewKafka,
+		paymentpostgres.NewRepository,
+		paymentsaga.NewProcess,
+		paymentsaga.NewHandler,
+		paymentsaga.NewReconciler,
 	),
-	fx.Invoke(RegisterWorker),
+	kafka.AsSubscription(paymentsaga.NewPaymentInitiatedSubscription),
+	kafka.AsSubscription(paymentsaga.NewPaymentSubscription),
+	kafka.AsSubscription(paymentsaga.NewAffiliateSubscription),
+	kafka.AsSubscription(paymentsaga.NewSettlementSubscription),
+	kafka.AsSubscription(paymentsaga.NewAgentSubscription),
+	fx.Invoke((*paymentsaga.Reconciler).Start),
 )
 
-func RegisterWorker(lifecycle fx.Lifecycle, c client.Client, act *activities.Activities, l logger.Factory) {
-	// Worker polls "payment-processing" queue
-	w := worker.New(c, "payment-processing", worker.Options{})
-
-	w.RegisterWorkflow(workflows.PaymentProcessingWorkflow)
-	w.RegisterActivity(act)
-
-	lifecycle.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			l.Bg().Info("Starting Temporal Orchestrator worker")
-			go func() {
-				if err := w.Run(worker.InterruptCh()); err != nil {
-					l.Bg().Error("Temporal Worker failed to run", zap.Error(err))
-				}
-			}()
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			l.Bg().Info("Stopping Temporal Orchestrator worker")
-			w.Stop()
-			return nil
-		},
-	})
+func Options(cfg *config.Config) (fx.Option, error) {
+	if err := cfg.ValidateOrchestrator(); err != nil {
+		return nil, err
+	}
+	common := fx.Options(
+		fx.Supply(cfg),
+		logger.Module,
+		telemetry.Module,
+		kafka.ProducerModule,
+		kafka.ConsumerModule,
+	)
+	var engine fx.Option
+	switch cfg.Orchestrator.Engine {
+	case config.OrchestratorEngineSaga:
+		engine = fx.Options(platformpostgres.Module, inbox.Module, outbox.Module, SagaModule)
+	case config.OrchestratorEngineTemporal:
+		engine = temporalengine.Module
+	}
+	return fx.Options(common, engine, fx.StartTimeout(lifecycleTimeout), fx.StopTimeout(lifecycleTimeout)), nil
 }

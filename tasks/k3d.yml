@@ -1,0 +1,835 @@
+version: '3'
+
+tasks:
+  k3d-prereqs:
+    desc: Check local tools needed for Docker-backed k3d and Istio deployment
+    cmds:
+      - |
+        set -eu
+        for tool in docker kubectl curl tar; do
+          if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "$tool is required for k3d deployment"
+            exit 1
+          fi
+        done
+        if ! command -v k3d >/dev/null 2>&1; then
+          docker compose -f dockers/docker-compose.yaml config --services | grep -qx k3d
+          echo "host k3d not found; using Docker Compose k3d CLI helper"
+        fi
+
+  k3d-clean-legacy-compose:
+    desc: Remove obsolete Docker Compose service containers that conflict with k3d ports
+    cmds:
+      - |
+        set -eu
+        containers=$(docker ps -aq --filter "name=^/master_go_cqrs_" || true)
+        if [ -z "$containers" ]; then
+          exit 0
+        fi
+        echo "Removing obsolete Docker Compose containers before k3d deploy:"
+        docker ps -a --filter "name=^/master_go_cqrs_" --format '  {{"{{"}}.Names{{"}}"}}'
+        docker rm -f $containers >/dev/null
+
+  ensure-istioctl:
+    desc: Ensure istioctl is available locally under .dev/tools
+    cmds:
+      - |
+        set -eu
+        if [ -x "{{.ISTIOCTL}}" ]; then
+          "{{.ISTIOCTL}}" version --remote=false >/dev/null
+          exit 0
+        fi
+        if command -v istioctl >/dev/null 2>&1; then
+          mkdir -p "$(dirname "{{.ISTIOCTL}}")"
+          cp "$(command -v istioctl)" "{{.ISTIOCTL}}"
+          chmod +x "{{.ISTIOCTL}}"
+          "{{.ISTIOCTL}}" version --remote=false >/dev/null
+          exit 0
+        fi
+
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$os" in
+          darwin) os="osx" ;;
+          linux) os="linux" ;;
+          *) echo "Unsupported OS for automatic istioctl install: $os"; exit 1 ;;
+        esac
+        case "$arch" in
+          arm64|aarch64) arch="arm64" ;;
+          x86_64|amd64) arch="amd64" ;;
+          *) echo "Unsupported architecture for automatic istioctl install: $arch"; exit 1 ;;
+        esac
+
+        tmp_dir="$(mktemp -d)"
+        trap 'rm -rf "$tmp_dir"' EXIT
+        archive="$tmp_dir/istio.tar.gz"
+        url="https://github.com/istio/istio/releases/download/{{.ISTIO_VERSION}}/istio-{{.ISTIO_VERSION}}-${os}-${arch}.tar.gz"
+        echo "Downloading istioctl {{.ISTIO_VERSION}} for ${os}-${arch}"
+        curl -fsSL "$url" -o "$archive"
+        tar -xzf "$archive" -C "$tmp_dir"
+        mkdir -p "$(dirname "{{.ISTIOCTL}}")"
+        cp "$tmp_dir/istio-{{.ISTIO_VERSION}}/bin/istioctl" "{{.ISTIOCTL}}"
+        chmod +x "{{.ISTIOCTL}}"
+        "{{.ISTIOCTL}}" version --remote=false >/dev/null
+
+  ensure-telepresence:
+    desc: Ensure the pinned Telepresence client is available under .dev/tools
+    cmds:
+      - |
+        set -eu
+        if [ -x "{{.TELEPRESENCE}}" ] && "{{.TELEPRESENCE}}" version 2>&1 | grep -q "v{{.TELEPRESENCE_VERSION}}"; then
+          exit 0
+        fi
+
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$os" in
+          darwin|linux) ;;
+          *) echo "Unsupported OS for automatic Telepresence install: $os"; exit 1 ;;
+        esac
+        case "$arch" in
+          arm64|aarch64) arch="arm64" ;;
+          x86_64|amd64) arch="amd64" ;;
+          *) echo "Unsupported architecture for automatic Telepresence install: $arch"; exit 1 ;;
+        esac
+
+        mkdir -p "$(dirname "{{.TELEPRESENCE}}")"
+        tmp_file="$(mktemp)"
+        trap 'rm -f "$tmp_file"' EXIT
+        url="https://github.com/telepresenceio/telepresence/releases/download/v{{.TELEPRESENCE_VERSION}}/telepresence-${os}-${arch}"
+        echo "Downloading Telepresence {{.TELEPRESENCE_VERSION}} for ${os}/${arch}"
+        curl -fsSL "$url" -o "$tmp_file"
+        chmod +x "$tmp_file"
+        mv "$tmp_file" "{{.TELEPRESENCE}}"
+        "{{.TELEPRESENCE}}" version 2>&1 | grep -q "v{{.TELEPRESENCE_VERSION}}"
+
+  ensure-air:
+    desc: Ensure the pinned Air hot-reload client is available under .dev/tools
+    cmds:
+      - |
+        set -eu
+        if [ -x "{{.AIR}}" ] && "{{.AIR}}" -v 2>&1 | grep -q "{{.AIR_VERSION}}"; then
+          exit 0
+        fi
+
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$os" in
+          darwin|linux) ;;
+          *) echo "Unsupported OS for automatic Air install: $os"; exit 1 ;;
+        esac
+        case "$arch" in
+          arm64|aarch64) arch="arm64" ;;
+          x86_64|amd64) arch="amd64" ;;
+          *) echo "Unsupported architecture for automatic Air install: $arch"; exit 1 ;;
+        esac
+
+        mkdir -p "$(dirname "{{.AIR}}")"
+        tmp_file="$(mktemp)"
+        trap 'rm -f "$tmp_file"' EXIT
+        url="https://github.com/air-verse/air/releases/download/v{{.AIR_VERSION}}/air_{{.AIR_VERSION}}_${os}_${arch}"
+        echo "Downloading Air {{.AIR_VERSION}} for ${os}/${arch}"
+        curl -fsSL "$url" -o "$tmp_file"
+        chmod +x "$tmp_file"
+        mv "$tmp_file" "{{.AIR}}"
+        "{{.AIR}}" -v 2>&1 | grep -q "{{.AIR_VERSION}}"
+
+  telepresence-manager:
+    desc: Install or upgrade the Telepresence traffic manager for local k3d access
+    # Skip the entire task when the traffic-manager already has ready replicas.
+    # This prevents re-running k3d-cluster-up while Telepresence holds the
+    # network, which would fail with "can't assign requested address" on
+    # 127.0.0.1:6445 because the Telepresence overlay interferes with local
+    # connections to the k3d API server.
+    status:
+      - kubectl -n "{{.TELEPRESENCE_MANAGER_NAMESPACE}}" get deployment/traffic-manager >/dev/null 2>&1
+      - |
+        ready=$(kubectl -n "{{.TELEPRESENCE_MANAGER_NAMESPACE}}" get deployment/traffic-manager \
+          -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        [ "${ready:-0}" -ge 1 ]
+    cmds:
+      - task: ensure-telepresence
+      - task: k3d-cluster-up
+      - |
+        set -eu
+        ns="{{.TELEPRESENCE_MANAGER_NAMESPACE}}"
+        if ! kubectl get namespace "$ns" >/dev/null 2>&1; then
+          kubectl create namespace "$ns"
+        fi
+        if kubectl -n "$ns" get deployment/traffic-manager >/dev/null 2>&1; then
+          "{{.TELEPRESENCE}}" helm upgrade \
+            --kubeconfig "{{.KUBE_CONFIG}}" \
+            --manager-namespace "$ns" \
+            --mapped-namespaces "{{.K8S_NAMESPACE}}" \
+            --version "{{.TELEPRESENCE_VERSION}}" \
+            --reuse-values \
+            --set routeController.enabled=true
+        else
+          "{{.TELEPRESENCE}}" helm install \
+            --kubeconfig "{{.KUBE_CONFIG}}" \
+            --manager-namespace "$ns" \
+            --mapped-namespaces "{{.K8S_NAMESPACE}}" \
+            --version "{{.TELEPRESENCE_VERSION}}" \
+            --set routeController.enabled=true
+        fi
+        kubectl -n "$ns" rollout status deployment/traffic-manager --timeout=180s
+
+  telepresence-connect:
+    desc: Connect the host network and DNS resolver to the k3d namespace
+    cmds:
+      - task: ensure-telepresence
+      - |
+        set -eu
+        manager_ns="{{.TELEPRESENCE_MANAGER_NAMESPACE}}"
+        if ! kubectl -n "$manager_ns" get deployment/traffic-manager >/dev/null 2>&1; then
+          echo "Telepresence traffic manager is not installed; run task dev-up or task dev-connect"
+          exit 1
+        fi
+
+        status=$("{{.TELEPRESENCE}}" status 2>&1 || true)
+        if ! echo "$status" | grep -Eiq 'Root Daemon[[:space:]]*:[[:space:]]*.*running'; then
+          echo "Telepresence needs administrator permission to start its local network daemon."
+          echo "Enter your macOS password if sudo prompts. This is required for host DNS access to k3d services."
+          if [ ! -t 0 ]; then
+            echo "Run this task from an interactive terminal so sudo can prompt for your password."
+            exit 1
+          fi
+          if ! sudo -v; then
+            echo "Could not authenticate sudo for the Telepresence network daemon."
+            echo "Run task dev-connect again and enter your macOS password when prompted."
+            exit 1
+          fi
+        fi
+
+        connect_telepresence() {
+          "{{.TELEPRESENCE}}" connect \
+            --kubeconfig "{{.KUBE_CONFIG}}" \
+            --manager-namespace "$manager_ns" \
+            --mapped-namespaces "{{.K8S_NAMESPACE}}" \
+            --namespace "{{.K8S_NAMESPACE}}"
+        }
+
+        if ! connect_output="$(connect_telepresence 2>&1)"; then
+          echo "$connect_output"
+          if echo "$connect_output" | grep -qi "Cluster configuration changed"; then
+            echo "Telepresence cluster configuration changed; reconnecting..."
+            "{{.TELEPRESENCE}}" quit >/dev/null 2>&1 || true
+            connect_telepresence
+          else
+            exit 1
+          fi
+        else
+          echo "$connect_output"
+        fi
+
+  telepresence-ready:
+    desc: Install Telepresence, connect this host to k3d, and verify service DNS access
+    cmds:
+      - task: telepresence-manager
+      - task: telepresence-connect
+      - task: telepresence-smoke
+
+  telepresence-smoke:
+    desc: Verify local TCP access to core k3d services through Telepresence
+    cmds:
+      - |
+        set -eu
+        mkdir -p "{{.DEV_DIR}}"
+        probe="{{.DEV_DIR}}/telepresence-probe.go"
+        trap 'rm -f "$probe"' EXIT
+        cat > "$probe" <<'EOF'
+        package main
+
+        import (
+          "fmt"
+          "net"
+          "os"
+          "time"
+        )
+
+        func main() {
+          for _, address := range os.Args[1:] {
+            var lastError error
+            for attempt := 0; attempt < 20; attempt++ {
+              connection, err := net.DialTimeout("tcp", address, 2*time.Second)
+              if err == nil {
+                connection.Close()
+                fmt.Printf("connected to %s\n", address)
+                lastError = nil
+                break
+              }
+              lastError = err
+              time.Sleep(500 * time.Millisecond)
+            }
+            if lastError != nil {
+              fmt.Fprintf(os.Stderr, "cannot connect to %s: %v\n", address, lastError)
+              os.Exit(1)
+            }
+          }
+        }
+        EOF
+        go run "$probe" \
+          "postgres.{{.K8S_NAMESPACE}}.svc.cluster.local:5432" \
+          "kafka.{{.K8S_NAMESPACE}}.svc.cluster.local:9092" \
+          "keycloak.{{.K8S_NAMESPACE}}.svc.cluster.local:8080" \
+          "otel.{{.K8S_NAMESPACE}}.svc.cluster.local:4318"
+
+  telepresence-disconnect:
+    desc: Disconnect Telepresence while leaving k3d running
+    cmds:
+      - |
+        set -eu
+        if [ ! -x "{{.TELEPRESENCE}}" ]; then
+          echo "Telepresence is not installed in {{.TELEPRESENCE}}"
+          exit 0
+        fi
+        "{{.TELEPRESENCE}}" quit >/dev/null 2>&1 || true
+        echo "Telepresence disconnected"
+
+  telepresence-assert-connected:
+    desc: Verify that Telepresence is already connected; fail if not
+    cmds:
+      - |
+        set -eu
+        if [ ! -x "{{.TELEPRESENCE}}" ]; then
+          echo "Telepresence is not installed. Run 'task dev-up' or 'task dev-connect' first."
+          exit 1
+        fi
+        status=$("{{.TELEPRESENCE}}" status 2>&1 || true)
+        if ! echo "$status" | grep -Eiq 'Root Daemon[[:space:]]*:[[:space:]]*.*running'; then
+          echo "Telepresence is not connected. Run 'task dev-up' or 'task dev-connect' first."
+          exit 1
+        fi
+        if ! echo "$status" | grep -Eiq 'User Daemon[[:space:]]*:[[:space:]]*.*running'; then
+          echo "Telepresence user daemon is not running. Run 'task dev-up' or 'task dev-connect' first."
+          exit 1
+        fi
+        echo "Telepresence is connected."
+
+  telepresence-status:
+    desc: Show the local Telepresence connection state
+    cmds:
+      - |
+        if [ -x "{{.TELEPRESENCE}}" ]; then
+          if status=$("{{.TELEPRESENCE}}" status 2>&1); then
+            echo "$status"
+          else
+            echo "Telepresence: disconnected"
+          fi
+        else
+          echo "Telepresence is not installed in {{.TELEPRESENCE}}"
+        fi
+
+  k3d-cluster-up:
+    desc: Create or select the local k3d cluster configured for Istio ingress
+    cmds:
+      - |
+        set -eu
+        for tool in docker kubectl; do
+          if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "$tool is required for k3d cluster setup"
+            exit 1
+          fi
+        done
+        run_k3d() {
+          if command -v k3d >/dev/null 2>&1; then
+            k3d "$@"
+          else
+            cd "{{.ROOT_DIR}}/dockers" && env -u KUBECONFIG docker compose run --rm --quiet-pull k3d "$@"
+          fi
+        }
+        mkdir -p "$(dirname "{{.KUBE_CONFIG}}")"
+        if run_k3d cluster list | awk 'NR > 1 {print $1}' | grep -qx "{{.K3D_CLUSTER}}"; then
+          echo "k3d cluster {{.K3D_CLUSTER}} already exists"
+        else
+          run_k3d cluster create --config "{{.K3D_CONFIG}}"
+        fi
+        run_k3d kubeconfig get "{{.K3D_CLUSTER}}" > "{{.KUBE_CONFIG}}"
+        kubectl config use-context "k3d-{{.K3D_CLUSTER}}" >/dev/null 2>&1 || true
+        echo "kubeconfig: {{.KUBE_CONFIG}}"
+
+  k3d-cluster-delete:
+    desc: Delete the local k3d cluster
+    cmds:
+      - task: telepresence-disconnect
+      - |
+        set -eu
+        run_k3d() {
+          if command -v k3d >/dev/null 2>&1; then
+            k3d "$@"
+          else
+            cd "{{.ROOT_DIR}}/dockers" && env -u KUBECONFIG docker compose run --rm --quiet-pull k3d "$@"
+          fi
+        }
+        if run_k3d cluster list | awk 'NR > 1 {print $1}' | grep -qx "{{.K3D_CLUSTER}}"; then
+          run_k3d cluster delete "{{.K3D_CLUSTER}}"
+          rm -f "{{.KUBE_CONFIG}}"
+        else
+          echo "k3d cluster {{.K3D_CLUSTER}} does not exist"
+        fi
+
+  k3d-istio-install:
+    desc: Install Istio into the k3d cluster and enable sidecar injection for the app namespace
+    cmds:
+      - task: k3d-cluster-up
+      - task: ensure-istioctl
+      - |
+        set -eu
+        "{{.ISTIOCTL}}" install -y --set profile={{.ISTIO_PROFILE}}
+        kubectl apply -f "{{.K3D_MANIFEST_DIR}}/00-namespace.yaml"
+        kubectl label namespace "{{.K8S_NAMESPACE}}" istio-injection=enabled --overwrite
+        kubectl -n istio-system rollout status deployment/istiod --timeout=240s
+        kubectl -n istio-system rollout status deployment/istio-ingressgateway --timeout=240s
+
+  k3d-image-import:
+    desc: Build service images and import them into the k3d cluster
+    cmds:
+      - task: image-all
+      - |
+        set -eu
+        run_k3d() {
+          if command -v k3d >/dev/null 2>&1; then
+            k3d "$@"
+          else
+            cd "{{.ROOT_DIR}}/dockers" && env -u KUBECONFIG docker compose run --rm --quiet-pull k3d "$@"
+          fi
+        }
+        run_k3d image import -c "{{.K3D_CLUSTER}}" \
+          "{{.IMAGE_REPOSITORY}}/user:{{.IMAGE_TAG}}" \
+          "{{.IMAGE_REPOSITORY}}/payment:{{.IMAGE_TAG}}" \
+          "{{.IMAGE_REPOSITORY}}/affiliate:{{.IMAGE_TAG}}" \
+          "{{.IMAGE_REPOSITORY}}/settlement:{{.IMAGE_TAG}}" \
+          "{{.IMAGE_REPOSITORY}}/agent:{{.IMAGE_TAG}}" \
+          "{{.IMAGE_REPOSITORY}}/orchestrator:{{.IMAGE_TAG}}"
+
+  gen-envoy-config:
+    desc: Generate envoy.yaml from envoy.tmpl.yaml with dockers/envoy/profiles/<profile>/envoy.env
+    vars:
+      ENVOY_PROFILE: '{{default "local" .ENVOY_PROFILE}}'
+    cmds:
+      - python3 dockers/envoy/generate_config.py --profile "{{.ENVOY_PROFILE}}"
+
+  k3d-sync-configmaps:
+    desc: Sync generated config artifacts into the k3d namespace
+    cmds:
+      - task: gen-proto
+      - task: gen-envoy-config
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/00-namespace.yaml"
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        kubectl -n "$ns" create configmap postgres-init \
+          --from-file=01-create-service-databases.sql=dockers/postgres/init/01-create-service-databases.sql \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n "$ns" create configmap keycloak-realm \
+          --from-file=backend-realm.json=dockers/keycloak/import/backend-realm.json \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n "$ns" create configmap otel-config \
+          --from-file=config.yaml=dockers/otel/config.yaml \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n "$ns" create configmap envoy-config \
+          --from-file=envoy.yaml=dockers/envoy/envoy.yaml \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n "$ns" create configmap envoy-proto \
+          --from-file=proto.pb=dockers/envoy/proto.pb \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n "$ns" create configmap envoy-swagger \
+          --from-file=envoy.swagger.json=docs/envoy.swagger.json \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+  k3d-apply-infra:
+    desc: Apply k3d infrastructure manifests
+    cmds:
+      - task: k3d-sync-configmaps
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/10-secrets.yaml"
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/20-postgres.yaml"
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/22-observability.yaml"
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/23-keycloak.yaml"
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/24-kafka.yaml"
+      - kubectl -n "{{.K8S_NAMESPACE}}" delete job/kafka-topics --ignore-not-found
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/25-kafka-topics.yaml"
+
+  k3d-wait-postgres:
+    desc: Wait for the k3d Postgres pod
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        kubectl -n "$ns" rollout status statefulset/postgres --timeout=240s
+        for attempt in $(seq 1 60); do
+          if kubectl -n "$ns" exec postgres-0 -c postgres -- pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 2
+        done
+        kubectl -n "$ns" get pod postgres-0
+        kubectl -n "$ns" logs postgres-0 -c postgres --tail=120
+        echo "k3d Postgres did not become ready in time"
+        exit 1
+
+  k3d-wait-infra:
+    desc: Wait for k3d infrastructure pods
+    cmds:
+      - task: k3d-wait-postgres
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        for deployment in jaeger otel keycloak; do
+          kubectl -n "$ns" rollout status "deployment/$deployment" --timeout=300s
+        done
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        echo "Waiting for Kafka broker..."
+        kubectl -n "$ns" rollout status statefulset/kafka --timeout=180s
+        kubectl -n "$ns" wait --for=condition=complete job/kafka-topics --timeout=180s
+
+  k3d-temporal-up:
+    desc: Bootstrap Temporal databases and deploy the pinned Temporal server and UI
+    cmds:
+      - task: k3d-wait-postgres
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/10-secrets.yaml"
+      - |
+        set -eu
+        kubectl -n "{{.K8S_NAMESPACE}}" exec -i postgres-0 -c postgres -- \
+          psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+          < dockers/postgres/init/01-create-service-databases.sql
+      - kubectl -n "{{.K8S_NAMESPACE}}" delete job/temporal-schema job/temporal-namespace --ignore-not-found
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/26-temporal.yaml"
+      - task: k3d-wait-temporal
+
+  k3d-wait-temporal:
+    desc: Wait for the optional Temporal server and UI
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        kubectl -n "$ns" wait --for=condition=complete job/temporal-schema --timeout=300s
+        kubectl -n "$ns" rollout status deployment/temporal --timeout=300s
+        kubectl -n "$ns" wait --for=condition=complete job/temporal-namespace --timeout=180s
+        kubectl -n "$ns" rollout status deployment/temporal-ui --timeout=180s
+
+  orchestrator-mode:
+    desc: Switch the orchestrator between saga and temporal after drain checks
+    vars:
+      MODE: '{{default "saga" .MODE}}'
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        mode="{{.MODE}}"
+        case "$mode" in
+          saga|temporal) ;;
+          *) echo "MODE must be saga or temporal"; exit 1 ;;
+        esac
+
+        if ! kubectl -n "$ns" get deployment/orchestrator >/dev/null 2>&1; then
+          echo "orchestrator deployment is not available; deploy the k3d stack first"
+          exit 1
+        fi
+        current=$(kubectl -n "$ns" get deployment/orchestrator -o jsonpath='{.spec.template.spec.containers[?(@.name=="orchestrator")].env[?(@.name=="ORCHESTRATOR_ENGINE")].value}')
+        current=${current:-saga}
+        if [ "$current" = "$mode" ]; then
+          echo "orchestrator is already using $mode"
+          exit 0
+        fi
+
+        saga_table=$(kubectl -n "$ns" exec postgres-0 -c postgres -- \
+          psql -U postgres -d master_go_cqrs_orchestrator -tAc \
+          "SELECT COALESCE(to_regclass('public.payment_sagas')::text, '')" | tr -d '[:space:]')
+        if [ -n "$saga_table" ]; then
+          active_sagas=$(kubectl -n "$ns" exec postgres-0 -c postgres -- \
+            psql -U postgres -d master_go_cqrs_orchestrator -tAc \
+            "SELECT count(*) FROM public.payment_sagas WHERE state NOT IN ('COMPLETED','COMPLETED_WITH_CALLBACK_FAILURE','FAILED')" | tr -d '[:space:]')
+          pending_outbox=$(kubectl -n "$ns" exec postgres-0 -c postgres -- \
+            psql -U postgres -d master_go_cqrs_orchestrator -tAc \
+            "SELECT count(*) FROM public.outbox_events WHERE status IN ('PENDING','PROCESSING')" | tr -d '[:space:]')
+          if [ "$active_sagas" != "0" ] || [ "$pending_outbox" != "0" ]; then
+            echo "refusing switch: active_sagas=$active_sagas pending_outbox=$pending_outbox"
+            exit 1
+          fi
+        fi
+
+        if [ "$mode" = "temporal" ]; then
+          task k3d-temporal-up
+        fi
+        if kubectl -n "$ns" get deployment/temporal >/dev/null 2>&1; then
+          if ! temporal_workflows=$(kubectl -n "$ns" exec deployment/temporal -c admin-tools -- \
+            temporal workflow list --namespace master-go-cqrs \
+            --query 'ExecutionStatus="Running" AND WorkflowType="PaymentOrchestrationWorkflow"' \
+            --limit 1 --output json 2>/dev/null); then
+            echo "unable to verify active Temporal workflows; refusing switch"
+            exit 1
+          fi
+          if echo "$temporal_workflows" | grep -Eq '"workflow(Id|_id)"'; then
+            echo "refusing switch: Temporal has an active payment workflow"
+            exit 1
+          fi
+        fi
+
+        kubectl -n "$ns" set env deployment/orchestrator \
+          ORCHESTRATOR_ENGINE="$mode" \
+          TEMPORAL_ADDRESS="temporal.master-go-cqrs.svc.cluster.local:7233" \
+          TEMPORAL_NAMESPACE="master-go-cqrs" \
+          TEMPORAL_TASK_QUEUE="payment-orchestration"
+        kubectl -n "$ns" rollout status deployment/orchestrator --timeout=300s
+        echo "orchestrator mode: $mode"
+
+  k3d-migrate:
+    desc: Apply service SQL migrations inside k3d Postgres
+    cmds:
+      - task: k3d-wait-postgres
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        kubectl -n "$ns" exec -i postgres-0 -c postgres -- \
+          psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+          < dockers/postgres/init/01-create-service-databases.sql
+        run_migrations() {
+          service="$1"
+          db="master_go_cqrs_${service}"
+          user="master_go_cqrs_${service}_user"
+          password="master_go_cqrs_${service}_password"
+          for file in "migrations/$service"/*.up.sql; do
+            [ -e "$file" ] || continue
+            echo "Applying $file to $db"
+            kubectl -n "$ns" exec -i postgres-0 -c postgres -- env PGPASSWORD="$password" psql -v ON_ERROR_STOP=1 -U "$user" -d "$db" < "$file"
+          done
+        }
+        run_migrations user
+        run_migrations payment
+        run_migrations affiliate
+        run_migrations settlement
+        run_migrations agent
+        run_migrations orchestrator
+
+  k3d-apply-apps:
+    desc: Apply k3d app, Envoy, Swagger UI, and Istio route manifests
+    cmds:
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/30-apps.yaml"
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/40-gateway.yaml"
+
+  k3d-set-images:
+    desc: Point k3d deployments at the configured image repository and tag
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        kubectl -n "$ns" set image deployment/user user="{{.IMAGE_REPOSITORY}}/user:{{.IMAGE_TAG}}"
+        kubectl -n "$ns" set image deployment/payment payment="{{.IMAGE_REPOSITORY}}/payment:{{.IMAGE_TAG}}"
+        kubectl -n "$ns" set image deployment/affiliate affiliate="{{.IMAGE_REPOSITORY}}/affiliate:{{.IMAGE_TAG}}"
+        kubectl -n "$ns" set image deployment/settlement settlement="{{.IMAGE_REPOSITORY}}/settlement:{{.IMAGE_TAG}}"
+        kubectl -n "$ns" set image deployment/agent agent="{{.IMAGE_REPOSITORY}}/agent:{{.IMAGE_TAG}}"
+        kubectl -n "$ns" set image deployment/orchestrator orchestrator="{{.IMAGE_REPOSITORY}}/orchestrator:{{.IMAGE_TAG}}"
+
+  k3d-restart-apps:
+    desc: Restart k3d app deployments so imported local images are picked up
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        kubectl -n "$ns" rollout restart deployment/user deployment/payment deployment/affiliate deployment/settlement deployment/agent deployment/orchestrator deployment/swagger-ui deployment/api-gateway
+
+  k3d-wait-apps:
+    desc: Wait for k3d app and gateway deployments
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        for deployment in user payment affiliate settlement agent orchestrator swagger-ui api-gateway; do
+          kubectl -n "$ns" rollout status "deployment/$deployment" --timeout=300s
+        done
+
+  k3d-apply:
+    desc: Apply all k3d manifests to an existing cluster
+    cmds:
+      - task: k3d-apply-infra
+      - task: k3d-wait-infra
+      - task: k3d-migrate
+      - task: k3d-apply-apps
+      - task: k3d-set-images
+      - task: k3d-restart-apps
+      - task: k3d-wait-apps
+
+  k3d-deploy:
+    desc: Create k3d, install Istio, import images, deploy services, and smoke check the public gateway
+    cmds:
+      - task: k3d-prereqs
+      - task: k3d-clean-legacy-compose
+      - task: k3d-istio-install
+      - task: k3d-image-import
+      - task: k3d-apply
+      - task: k3d-smoke
+      - task: k3d-status
+
+  k3d-smoke:
+    desc: Verify the Istio ingress route to Envoy and app health
+    cmds:
+      - |
+        set -eu
+        gateway_url="${GATEWAY_URL:-http://localhost:8888}"
+        for attempt in $(seq 1 60); do
+          if curl -fsS "$gateway_url/api/v1/health" >/dev/null 2>&1; then
+            echo "k3d gateway smoke check passed: $gateway_url"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "API health endpoint was not reachable through k3d Istio ingress at $gateway_url/api/v1/health"
+        exit 1
+
+  k3d-status:
+    desc: Show k3d namespace and Istio status
+    cmds:
+      - kubectl -n "{{.K8S_NAMESPACE}}" get pods,svc,gateway,virtualservice
+      - kubectl -n istio-system get pods,svc
+
+  k3d-logs:
+    desc: Follow logs for a k3d deployment. Usage `task k3d-logs SERVICE=user`
+    vars:
+      SERVICE: '{{default "user" .SERVICE}}'
+    cmds:
+      - kubectl -n "{{.K8S_NAMESPACE}}" logs -f "deployment/{{.SERVICE}}" -c "{{.SERVICE}}" --tail=160
+
+  k3d-ui-urls:
+    desc: Show and verify browser UI URLs through Telepresence service DNS
+    cmds:
+      - task: telepresence-assert-connected
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        keycloak_url="http://keycloak.$ns.svc.cluster.local:8080"
+        jaeger_url="http://jaeger.$ns.svc.cluster.local:16686"
+        temporal_url="http://temporal-ui.$ns.svc.cluster.local:8080"
+        kafka_addr="kafka.$ns.svc.cluster.local:9092"
+
+        kubectl -n "$ns" rollout status deployment/keycloak --timeout=300s
+        kubectl -n "$ns" rollout status deployment/jaeger --timeout=300s
+
+        # Health checks run inside the cluster via istio-proxy to avoid
+        # Telepresence-to-Istio-sidecar mTLS hangs on HTTP requests.
+        check_url() {
+          local deploy="$1" container="$2" url="$3" label="$4"
+          for attempt in $(seq 1 30); do
+            if kubectl -n "$ns" exec "deployment/$deploy" -c "$container" -- \
+                 curl -fsS --connect-timeout 3 --max-time 5 "$url" >/dev/null 2>&1; then
+              return 0
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "$label did not become ready: $url"
+              exit 1
+            fi
+            sleep 2
+          done
+        }
+
+        check_url keycloak istio-proxy \
+          "http://localhost:8080/realms/backend/.well-known/openid-configuration" \
+          "Keycloak OIDC discovery endpoint"
+        check_url jaeger istio-proxy \
+          "http://localhost:16686/api/services" \
+          "Jaeger API"
+
+        echo "Telepresence service DNS is ready."
+        echo "Keycloak admin: $keycloak_url/admin"
+        echo "Keycloak discovery: $keycloak_url/realms/backend/.well-known/openid-configuration"
+        echo "Jaeger UI: $jaeger_url"
+        if kubectl -n "$ns" get svc/temporal-ui >/dev/null 2>&1; then
+          kubectl -n "$ns" rollout status deployment/temporal-ui --timeout=180s
+          check_url temporal-ui istio-proxy \
+            "http://localhost:8080/" \
+            "Temporal UI"
+          echo "Temporal UI: $temporal_url"
+        else
+          echo "Temporal UI: not deployed; run task k3d-temporal-up first."
+        fi
+        echo "Kafka bootstrap: $kafka_addr"
+
+  k3d-hosts:
+    desc: Update /etc/hosts with k3d ClusterIP aliases for browser access
+    cmds:
+      - task: telepresence-assert-connected
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        begin="# master_go_cqrs k3d service hosts begin"
+        end="# master_go_cqrs k3d service hosts end"
+        tmp_hosts="$(mktemp)"
+        block="$(mktemp)"
+        old_block="$(mktemp)"
+        cleanup() {
+          rm -f "$tmp_hosts" "$block" "$old_block"
+        }
+        trap cleanup EXIT
+
+        # Extract the existing managed block from /etc/hosts for diff display.
+        awk -v begin="$begin" -v end="$end" '
+          $0 == begin { inside = 1; next }
+          $0 == end   { inside = 0; next }
+          inside == 1 { print }
+        ' /etc/hosts > "$old_block"
+
+        # Resolve the current ClusterIP for each service and append to the
+        # new block file. Services that don't exist or have no IP are skipped.
+        add_service_host() {
+          local service="$1" host="$2"
+          if ! kubectl -n "$ns" get svc "$service" >/dev/null 2>&1; then
+            return
+          fi
+          local ip
+          ip="$(kubectl -n "$ns" get svc "$service" -o jsonpath='{.spec.clusterIP}')"
+          if [ -z "$ip" ] || [ "$ip" = "None" ]; then
+            return
+          fi
+          printf '%s\t%s %s.%s\n' "$ip" "$host" "$service" "$ns" >> "$block"
+        }
+
+        add_service_host keycloak     "keycloak.$ns.svc.cluster.local"
+        add_service_host jaeger       "jaeger.$ns.svc.cluster.local"
+        add_service_host temporal-ui  "temporal-ui.$ns.svc.cluster.local"
+
+        # Rebuild /etc/hosts: keep everything outside the managed block,
+        # then append the freshly resolved entries.
+        awk -v begin="$begin" -v end="$end" '
+          $0 == begin { skip = 1; next }
+          $0 == end   { skip = 0; next }
+          skip != 1   { print }
+        ' /etc/hosts > "$tmp_hosts"
+        {
+          printf '%s\n' "$begin"
+          cat "$block"
+          printf '%s\n' "$end"
+        } >> "$tmp_hosts"
+
+        # Compare and apply.
+        if cmp -s "$tmp_hosts" /etc/hosts; then
+          echo "/etc/hosts is up-to-date."
+        else
+          # Show per-service IP changes when an old block existed.
+          if [ -s "$old_block" ]; then
+            echo "IP changes detected:"
+            while IFS="$(printf '\t')" read -r new_ip new_hosts; do
+              host="$(echo "$new_hosts" | awk '{print $1}')"
+              old_ip="$(awk -v h="$host" '$2 == h || $3 == h {print $1; exit}' "$old_block")"
+              if [ -z "$old_ip" ]; then
+                printf '  + %s  %s\n' "$new_ip" "$host"
+              elif [ "$old_ip" != "$new_ip" ]; then
+                printf '  ~ %s → %s  %s\n' "$old_ip" "$new_ip" "$host"
+              fi
+            done < "$block"
+          else
+            echo "Adding k3d service aliases to /etc/hosts."
+          fi
+          sudo cp "$tmp_hosts" /etc/hosts
+        fi
+
+        echo "Hosts ready:"
+        cat "$block"
+        echo "Keep Telepresence connected with: task dev-connect"
+
+  k3d-kafka-url:
+    desc: Show Kafka service address reachable through Telepresence
+    cmds:
+      - task: telepresence-ready
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout status statefulset/kafka --timeout=180s
+      - 'echo "Kafka bootstrap: kafka.{{.K8S_NAMESPACE}}.svc.cluster.local:9092"'

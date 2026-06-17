@@ -22,142 +22,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type CalculateAndCreditCommissionRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	AgentId           string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	TransactionAmount float64                `protobuf:"fixed64,2,opt,name=transaction_amount,json=transactionAmount,proto3" json:"transaction_amount,omitempty"`
-	Rank              string                 `protobuf:"bytes,3,opt,name=rank,proto3" json:"rank,omitempty"`
-	TransactionId     string                 `protobuf:"bytes,4,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *CalculateAndCreditCommissionRequest) Reset() {
-	*x = CalculateAndCreditCommissionRequest{}
-	mi := &file_proto_settlement_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CalculateAndCreditCommissionRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CalculateAndCreditCommissionRequest) ProtoMessage() {}
-
-func (x *CalculateAndCreditCommissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CalculateAndCreditCommissionRequest.ProtoReflect.Descriptor instead.
-func (*CalculateAndCreditCommissionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *CalculateAndCreditCommissionRequest) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
-}
-
-func (x *CalculateAndCreditCommissionRequest) GetTransactionAmount() float64 {
-	if x != nil {
-		return x.TransactionAmount
-	}
-	return 0
-}
-
-func (x *CalculateAndCreditCommissionRequest) GetRank() string {
-	if x != nil {
-		return x.Rank
-	}
-	return ""
-}
-
-func (x *CalculateAndCreditCommissionRequest) GetTransactionId() string {
-	if x != nil {
-		return x.TransactionId
-	}
-	return ""
-}
-
-type CalculateAndCreditCommissionResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	AgentId          string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	CommissionAmount float64                `protobuf:"fixed64,2,opt,name=commission_amount,json=commissionAmount,proto3" json:"commission_amount,omitempty"`
-	NewBalance       float64                `protobuf:"fixed64,3,opt,name=new_balance,json=newBalance,proto3" json:"new_balance,omitempty"`
-	Status           string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *CalculateAndCreditCommissionResponse) Reset() {
-	*x = CalculateAndCreditCommissionResponse{}
-	mi := &file_proto_settlement_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CalculateAndCreditCommissionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CalculateAndCreditCommissionResponse) ProtoMessage() {}
-
-func (x *CalculateAndCreditCommissionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CalculateAndCreditCommissionResponse.ProtoReflect.Descriptor instead.
-func (*CalculateAndCreditCommissionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *CalculateAndCreditCommissionResponse) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
-}
-
-func (x *CalculateAndCreditCommissionResponse) GetCommissionAmount() float64 {
-	if x != nil {
-		return x.CommissionAmount
-	}
-	return 0
-}
-
-func (x *CalculateAndCreditCommissionResponse) GetNewBalance() float64 {
-	if x != nil {
-		return x.NewBalance
-	}
-	return 0
-}
-
-func (x *CalculateAndCreditCommissionResponse) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
 type GetAgentBalanceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
@@ -167,7 +31,7 @@ type GetAgentBalanceRequest struct {
 
 func (x *GetAgentBalanceRequest) Reset() {
 	*x = GetAgentBalanceRequest{}
-	mi := &file_proto_settlement_proto_msgTypes[2]
+	mi := &file_proto_settlement_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +43,7 @@ func (x *GetAgentBalanceRequest) String() string {
 func (*GetAgentBalanceRequest) ProtoMessage() {}
 
 func (x *GetAgentBalanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[2]
+	mi := &file_proto_settlement_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,7 +56,7 @@ func (x *GetAgentBalanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentBalanceRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentBalanceRequest) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{2}
+	return file_proto_settlement_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetAgentBalanceRequest) GetAgentId() string {
@@ -214,7 +78,7 @@ type GetAgentBalanceResponse struct {
 
 func (x *GetAgentBalanceResponse) Reset() {
 	*x = GetAgentBalanceResponse{}
-	mi := &file_proto_settlement_proto_msgTypes[3]
+	mi := &file_proto_settlement_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -226,7 +90,7 @@ func (x *GetAgentBalanceResponse) String() string {
 func (*GetAgentBalanceResponse) ProtoMessage() {}
 
 func (x *GetAgentBalanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[3]
+	mi := &file_proto_settlement_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -239,7 +103,7 @@ func (x *GetAgentBalanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentBalanceResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentBalanceResponse) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{3}
+	return file_proto_settlement_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetAgentBalanceResponse) GetAgentId() string {
@@ -281,7 +145,7 @@ type RequestWithdrawalRequest struct {
 
 func (x *RequestWithdrawalRequest) Reset() {
 	*x = RequestWithdrawalRequest{}
-	mi := &file_proto_settlement_proto_msgTypes[4]
+	mi := &file_proto_settlement_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -293,7 +157,7 @@ func (x *RequestWithdrawalRequest) String() string {
 func (*RequestWithdrawalRequest) ProtoMessage() {}
 
 func (x *RequestWithdrawalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[4]
+	mi := &file_proto_settlement_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -306,7 +170,7 @@ func (x *RequestWithdrawalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestWithdrawalRequest.ProtoReflect.Descriptor instead.
 func (*RequestWithdrawalRequest) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{4}
+	return file_proto_settlement_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RequestWithdrawalRequest) GetAgentId() string {
@@ -343,7 +207,7 @@ type RequestWithdrawalResponse struct {
 
 func (x *RequestWithdrawalResponse) Reset() {
 	*x = RequestWithdrawalResponse{}
-	mi := &file_proto_settlement_proto_msgTypes[5]
+	mi := &file_proto_settlement_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -355,7 +219,7 @@ func (x *RequestWithdrawalResponse) String() string {
 func (*RequestWithdrawalResponse) ProtoMessage() {}
 
 func (x *RequestWithdrawalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[5]
+	mi := &file_proto_settlement_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,7 +232,7 @@ func (x *RequestWithdrawalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestWithdrawalResponse.ProtoReflect.Descriptor instead.
 func (*RequestWithdrawalResponse) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{5}
+	return file_proto_settlement_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RequestWithdrawalResponse) GetWithdrawalId() string {
@@ -416,7 +280,7 @@ type AdjustCreditLimitRequest struct {
 
 func (x *AdjustCreditLimitRequest) Reset() {
 	*x = AdjustCreditLimitRequest{}
-	mi := &file_proto_settlement_proto_msgTypes[6]
+	mi := &file_proto_settlement_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -428,7 +292,7 @@ func (x *AdjustCreditLimitRequest) String() string {
 func (*AdjustCreditLimitRequest) ProtoMessage() {}
 
 func (x *AdjustCreditLimitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[6]
+	mi := &file_proto_settlement_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -441,7 +305,7 @@ func (x *AdjustCreditLimitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdjustCreditLimitRequest.ProtoReflect.Descriptor instead.
 func (*AdjustCreditLimitRequest) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{6}
+	return file_proto_settlement_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AdjustCreditLimitRequest) GetAgentId() string {
@@ -469,7 +333,7 @@ type AdjustCreditLimitResponse struct {
 
 func (x *AdjustCreditLimitResponse) Reset() {
 	*x = AdjustCreditLimitResponse{}
-	mi := &file_proto_settlement_proto_msgTypes[7]
+	mi := &file_proto_settlement_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +345,7 @@ func (x *AdjustCreditLimitResponse) String() string {
 func (*AdjustCreditLimitResponse) ProtoMessage() {}
 
 func (x *AdjustCreditLimitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_settlement_proto_msgTypes[7]
+	mi := &file_proto_settlement_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +358,7 @@ func (x *AdjustCreditLimitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdjustCreditLimitResponse.ProtoReflect.Descriptor instead.
 func (*AdjustCreditLimitResponse) Descriptor() ([]byte, []int) {
-	return file_proto_settlement_proto_rawDescGZIP(), []int{7}
+	return file_proto_settlement_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AdjustCreditLimitResponse) GetAgentId() string {
@@ -522,18 +386,7 @@ var File_proto_settlement_proto protoreflect.FileDescriptor
 
 const file_proto_settlement_proto_rawDesc = "" +
 	"\n" +
-	"\x16proto/settlement.proto\x12\rsettlement.v1\x1a\x1cgoogle/api/annotations.proto\"\xaa\x01\n" +
-	"#CalculateAndCreditCommissionRequest\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12-\n" +
-	"\x12transaction_amount\x18\x02 \x01(\x01R\x11transactionAmount\x12\x12\n" +
-	"\x04rank\x18\x03 \x01(\tR\x04rank\x12%\n" +
-	"\x0etransaction_id\x18\x04 \x01(\tR\rtransactionId\"\xa7\x01\n" +
-	"$CalculateAndCreditCommissionResponse\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12+\n" +
-	"\x11commission_amount\x18\x02 \x01(\x01R\x10commissionAmount\x12\x1f\n" +
-	"\vnew_balance\x18\x03 \x01(\x01R\n" +
-	"newBalance\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\"3\n" +
+	"\x16proto/settlement.proto\x12\rsettlement.v1\x1a\x1cgoogle/api/annotations.proto\"3\n" +
 	"\x16GetAgentBalanceRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\"\xa1\x01\n" +
 	"\x17GetAgentBalanceResponse\x12\x19\n" +
@@ -557,9 +410,8 @@ const file_proto_settlement_proto_rawDesc = "" +
 	"\x19AdjustCreditLimitResponse\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1b\n" +
 	"\tnew_limit\x18\x02 \x01(\x01R\bnewLimit\x12\x18\n" +
-	"\asuccess\x18\x03 \x01(\bR\asuccess2\xd5\x04\n" +
-	"\x11SettlementService\x12\x87\x01\n" +
-	"\x1cCalculateAndCreditCommission\x122.settlement.v1.CalculateAndCreditCommissionRequest\x1a3.settlement.v1.CalculateAndCreditCommissionResponse\x12\x8f\x01\n" +
+	"\asuccess\x18\x03 \x01(\bR\asuccess2\xcb\x03\n" +
+	"\x11SettlementService\x12\x8f\x01\n" +
 	"\x0fGetAgentBalance\x12%.settlement.v1.GetAgentBalanceRequest\x1a&.settlement.v1.GetAgentBalanceResponse\"-\x82\xd3\xe4\x93\x02'\x12%/api/v1/settlement/balance/{agent_id}\x12\x8e\x01\n" +
 	"\x11RequestWithdrawal\x12'.settlement.v1.RequestWithdrawalRequest\x1a(.settlement.v1.RequestWithdrawalResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/settlement/withdraw\x12\x92\x01\n" +
 	"\x11AdjustCreditLimit\x12'.settlement.v1.AdjustCreditLimitRequest\x1a(.settlement.v1.AdjustCreditLimitResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/settlement/credit/limitBAZ?github/master_go_cqrs/internal/genproto/settlement;settlementv1b\x06proto3"
@@ -576,28 +428,24 @@ func file_proto_settlement_proto_rawDescGZIP() []byte {
 	return file_proto_settlement_proto_rawDescData
 }
 
-var file_proto_settlement_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_proto_settlement_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_settlement_proto_goTypes = []any{
-	(*CalculateAndCreditCommissionRequest)(nil),  // 0: settlement.v1.CalculateAndCreditCommissionRequest
-	(*CalculateAndCreditCommissionResponse)(nil), // 1: settlement.v1.CalculateAndCreditCommissionResponse
-	(*GetAgentBalanceRequest)(nil),               // 2: settlement.v1.GetAgentBalanceRequest
-	(*GetAgentBalanceResponse)(nil),              // 3: settlement.v1.GetAgentBalanceResponse
-	(*RequestWithdrawalRequest)(nil),             // 4: settlement.v1.RequestWithdrawalRequest
-	(*RequestWithdrawalResponse)(nil),            // 5: settlement.v1.RequestWithdrawalResponse
-	(*AdjustCreditLimitRequest)(nil),             // 6: settlement.v1.AdjustCreditLimitRequest
-	(*AdjustCreditLimitResponse)(nil),            // 7: settlement.v1.AdjustCreditLimitResponse
+	(*GetAgentBalanceRequest)(nil),    // 0: settlement.v1.GetAgentBalanceRequest
+	(*GetAgentBalanceResponse)(nil),   // 1: settlement.v1.GetAgentBalanceResponse
+	(*RequestWithdrawalRequest)(nil),  // 2: settlement.v1.RequestWithdrawalRequest
+	(*RequestWithdrawalResponse)(nil), // 3: settlement.v1.RequestWithdrawalResponse
+	(*AdjustCreditLimitRequest)(nil),  // 4: settlement.v1.AdjustCreditLimitRequest
+	(*AdjustCreditLimitResponse)(nil), // 5: settlement.v1.AdjustCreditLimitResponse
 }
 var file_proto_settlement_proto_depIdxs = []int32{
-	0, // 0: settlement.v1.SettlementService.CalculateAndCreditCommission:input_type -> settlement.v1.CalculateAndCreditCommissionRequest
-	2, // 1: settlement.v1.SettlementService.GetAgentBalance:input_type -> settlement.v1.GetAgentBalanceRequest
-	4, // 2: settlement.v1.SettlementService.RequestWithdrawal:input_type -> settlement.v1.RequestWithdrawalRequest
-	6, // 3: settlement.v1.SettlementService.AdjustCreditLimit:input_type -> settlement.v1.AdjustCreditLimitRequest
-	1, // 4: settlement.v1.SettlementService.CalculateAndCreditCommission:output_type -> settlement.v1.CalculateAndCreditCommissionResponse
-	3, // 5: settlement.v1.SettlementService.GetAgentBalance:output_type -> settlement.v1.GetAgentBalanceResponse
-	5, // 6: settlement.v1.SettlementService.RequestWithdrawal:output_type -> settlement.v1.RequestWithdrawalResponse
-	7, // 7: settlement.v1.SettlementService.AdjustCreditLimit:output_type -> settlement.v1.AdjustCreditLimitResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	0, // 0: settlement.v1.SettlementService.GetAgentBalance:input_type -> settlement.v1.GetAgentBalanceRequest
+	2, // 1: settlement.v1.SettlementService.RequestWithdrawal:input_type -> settlement.v1.RequestWithdrawalRequest
+	4, // 2: settlement.v1.SettlementService.AdjustCreditLimit:input_type -> settlement.v1.AdjustCreditLimitRequest
+	1, // 3: settlement.v1.SettlementService.GetAgentBalance:output_type -> settlement.v1.GetAgentBalanceResponse
+	3, // 4: settlement.v1.SettlementService.RequestWithdrawal:output_type -> settlement.v1.RequestWithdrawalResponse
+	5, // 5: settlement.v1.SettlementService.AdjustCreditLimit:output_type -> settlement.v1.AdjustCreditLimitResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -614,7 +462,7 @@ func file_proto_settlement_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_settlement_proto_rawDesc), len(file_proto_settlement_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

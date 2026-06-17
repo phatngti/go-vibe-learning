@@ -126,126 +126,6 @@ func (x *RegisterReferralResponse) GetMessage() string {
 	return ""
 }
 
-type AccumulateVolumeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	Amount        float64                `protobuf:"fixed64,2,opt,name=amount,proto3" json:"amount,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AccumulateVolumeRequest) Reset() {
-	*x = AccumulateVolumeRequest{}
-	mi := &file_proto_affiliate_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AccumulateVolumeRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AccumulateVolumeRequest) ProtoMessage() {}
-
-func (x *AccumulateVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_affiliate_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AccumulateVolumeRequest.ProtoReflect.Descriptor instead.
-func (*AccumulateVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_proto_affiliate_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *AccumulateVolumeRequest) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
-}
-
-func (x *AccumulateVolumeRequest) GetAmount() float64 {
-	if x != nil {
-		return x.Amount
-	}
-	return 0
-}
-
-type AccumulateVolumeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	TotalVolume   float64                `protobuf:"fixed64,2,opt,name=total_volume,json=totalVolume,proto3" json:"total_volume,omitempty"`
-	CurrentRank   string                 `protobuf:"bytes,3,opt,name=current_rank,json=currentRank,proto3" json:"current_rank,omitempty"`
-	RankPromoted  bool                   `protobuf:"varint,4,opt,name=rank_promoted,json=rankPromoted,proto3" json:"rank_promoted,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AccumulateVolumeResponse) Reset() {
-	*x = AccumulateVolumeResponse{}
-	mi := &file_proto_affiliate_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AccumulateVolumeResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AccumulateVolumeResponse) ProtoMessage() {}
-
-func (x *AccumulateVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_affiliate_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AccumulateVolumeResponse.ProtoReflect.Descriptor instead.
-func (*AccumulateVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_affiliate_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *AccumulateVolumeResponse) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
-}
-
-func (x *AccumulateVolumeResponse) GetTotalVolume() float64 {
-	if x != nil {
-		return x.TotalVolume
-	}
-	return 0
-}
-
-func (x *AccumulateVolumeResponse) GetCurrentRank() string {
-	if x != nil {
-		return x.CurrentRank
-	}
-	return ""
-}
-
-func (x *AccumulateVolumeResponse) GetRankPromoted() bool {
-	if x != nil {
-		return x.RankPromoted
-	}
-	return false
-}
-
 type GetAgentRankRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
@@ -255,7 +135,7 @@ type GetAgentRankRequest struct {
 
 func (x *GetAgentRankRequest) Reset() {
 	*x = GetAgentRankRequest{}
-	mi := &file_proto_affiliate_proto_msgTypes[4]
+	mi := &file_proto_affiliate_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +147,7 @@ func (x *GetAgentRankRequest) String() string {
 func (*GetAgentRankRequest) ProtoMessage() {}
 
 func (x *GetAgentRankRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_affiliate_proto_msgTypes[4]
+	mi := &file_proto_affiliate_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +160,7 @@ func (x *GetAgentRankRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentRankRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentRankRequest) Descriptor() ([]byte, []int) {
-	return file_proto_affiliate_proto_rawDescGZIP(), []int{4}
+	return file_proto_affiliate_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetAgentRankRequest) GetAgentId() string {
@@ -302,7 +182,7 @@ type GetAgentRankResponse struct {
 
 func (x *GetAgentRankResponse) Reset() {
 	*x = GetAgentRankResponse{}
-	mi := &file_proto_affiliate_proto_msgTypes[5]
+	mi := &file_proto_affiliate_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -314,7 +194,7 @@ func (x *GetAgentRankResponse) String() string {
 func (*GetAgentRankResponse) ProtoMessage() {}
 
 func (x *GetAgentRankResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_affiliate_proto_msgTypes[5]
+	mi := &file_proto_affiliate_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -327,7 +207,7 @@ func (x *GetAgentRankResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentRankResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentRankResponse) Descriptor() ([]byte, []int) {
-	return file_proto_affiliate_proto_rawDescGZIP(), []int{5}
+	return file_proto_affiliate_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetAgentRankResponse) GetAgentId() string {
@@ -367,7 +247,7 @@ type GetDownlineRequest struct {
 
 func (x *GetDownlineRequest) Reset() {
 	*x = GetDownlineRequest{}
-	mi := &file_proto_affiliate_proto_msgTypes[6]
+	mi := &file_proto_affiliate_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -379,7 +259,7 @@ func (x *GetDownlineRequest) String() string {
 func (*GetDownlineRequest) ProtoMessage() {}
 
 func (x *GetDownlineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_affiliate_proto_msgTypes[6]
+	mi := &file_proto_affiliate_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -392,7 +272,7 @@ func (x *GetDownlineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDownlineRequest.ProtoReflect.Descriptor instead.
 func (*GetDownlineRequest) Descriptor() ([]byte, []int) {
-	return file_proto_affiliate_proto_rawDescGZIP(), []int{6}
+	return file_proto_affiliate_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetDownlineRequest) GetAgentId() string {
@@ -413,7 +293,7 @@ type GetDownlineResponse struct {
 
 func (x *GetDownlineResponse) Reset() {
 	*x = GetDownlineResponse{}
-	mi := &file_proto_affiliate_proto_msgTypes[7]
+	mi := &file_proto_affiliate_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -425,7 +305,7 @@ func (x *GetDownlineResponse) String() string {
 func (*GetDownlineResponse) ProtoMessage() {}
 
 func (x *GetDownlineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_affiliate_proto_msgTypes[7]
+	mi := &file_proto_affiliate_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -438,7 +318,7 @@ func (x *GetDownlineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDownlineResponse.ProtoReflect.Descriptor instead.
 func (*GetDownlineResponse) Descriptor() ([]byte, []int) {
-	return file_proto_affiliate_proto_rawDescGZIP(), []int{7}
+	return file_proto_affiliate_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetDownlineResponse) GetAgentId() string {
@@ -474,15 +354,7 @@ const file_proto_affiliate_proto_rawDesc = "" +
 	"referee_id\x18\x02 \x01(\tR\trefereeId\"N\n" +
 	"\x18RegisterReferralResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"L\n" +
-	"\x17AccumulateVolumeRequest\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x16\n" +
-	"\x06amount\x18\x02 \x01(\x01R\x06amount\"\xa0\x01\n" +
-	"\x18AccumulateVolumeResponse\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12!\n" +
-	"\ftotal_volume\x18\x02 \x01(\x01R\vtotalVolume\x12!\n" +
-	"\fcurrent_rank\x18\x03 \x01(\tR\vcurrentRank\x12#\n" +
-	"\rrank_promoted\x18\x04 \x01(\bR\frankPromoted\"0\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"0\n" +
 	"\x13GetAgentRankRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\"\xad\x01\n" +
 	"\x14GetAgentRankResponse\x12\x19\n" +
@@ -496,10 +368,9 @@ const file_proto_affiliate_proto_rawDesc = "" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x1f\n" +
 	"\vreferee_ids\x18\x02 \x03(\tR\n" +
 	"refereeIds\x12'\n" +
-	"\x0ftotal_referrals\x18\x03 \x01(\x05R\x0etotalReferrals2\x8c\x04\n" +
+	"\x0ftotal_referrals\x18\x03 \x01(\x05R\x0etotalReferrals2\xa9\x03\n" +
 	"\x10AffiliateService\x12\x8d\x01\n" +
-	"\x10RegisterReferral\x12%.affiliate.v1.RegisterReferralRequest\x1a&.affiliate.v1.RegisterReferralResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/affiliate/referral/link\x12a\n" +
-	"\x10AccumulateVolume\x12%.affiliate.v1.AccumulateVolumeRequest\x1a&.affiliate.v1.AccumulateVolumeResponse\x12\x80\x01\n" +
+	"\x10RegisterReferral\x12%.affiliate.v1.RegisterReferralRequest\x1a&.affiliate.v1.RegisterReferralResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/affiliate/referral/link\x12\x80\x01\n" +
 	"\fGetAgentRank\x12!.affiliate.v1.GetAgentRankRequest\x1a\".affiliate.v1.GetAgentRankResponse\")\x82\xd3\xe4\x93\x02#\x12!/api/v1/affiliate/rank/{agent_id}\x12\x81\x01\n" +
 	"\vGetDownline\x12 .affiliate.v1.GetDownlineRequest\x1a!.affiliate.v1.GetDownlineResponse\"-\x82\xd3\xe4\x93\x02'\x12%/api/v1/affiliate/downline/{agent_id}B?Z=github/master_go_cqrs/internal/genproto/affiliate;affiliatev1b\x06proto3"
 
@@ -515,28 +386,24 @@ func file_proto_affiliate_proto_rawDescGZIP() []byte {
 	return file_proto_affiliate_proto_rawDescData
 }
 
-var file_proto_affiliate_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_proto_affiliate_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_affiliate_proto_goTypes = []any{
 	(*RegisterReferralRequest)(nil),  // 0: affiliate.v1.RegisterReferralRequest
 	(*RegisterReferralResponse)(nil), // 1: affiliate.v1.RegisterReferralResponse
-	(*AccumulateVolumeRequest)(nil),  // 2: affiliate.v1.AccumulateVolumeRequest
-	(*AccumulateVolumeResponse)(nil), // 3: affiliate.v1.AccumulateVolumeResponse
-	(*GetAgentRankRequest)(nil),      // 4: affiliate.v1.GetAgentRankRequest
-	(*GetAgentRankResponse)(nil),     // 5: affiliate.v1.GetAgentRankResponse
-	(*GetDownlineRequest)(nil),       // 6: affiliate.v1.GetDownlineRequest
-	(*GetDownlineResponse)(nil),      // 7: affiliate.v1.GetDownlineResponse
+	(*GetAgentRankRequest)(nil),      // 2: affiliate.v1.GetAgentRankRequest
+	(*GetAgentRankResponse)(nil),     // 3: affiliate.v1.GetAgentRankResponse
+	(*GetDownlineRequest)(nil),       // 4: affiliate.v1.GetDownlineRequest
+	(*GetDownlineResponse)(nil),      // 5: affiliate.v1.GetDownlineResponse
 }
 var file_proto_affiliate_proto_depIdxs = []int32{
 	0, // 0: affiliate.v1.AffiliateService.RegisterReferral:input_type -> affiliate.v1.RegisterReferralRequest
-	2, // 1: affiliate.v1.AffiliateService.AccumulateVolume:input_type -> affiliate.v1.AccumulateVolumeRequest
-	4, // 2: affiliate.v1.AffiliateService.GetAgentRank:input_type -> affiliate.v1.GetAgentRankRequest
-	6, // 3: affiliate.v1.AffiliateService.GetDownline:input_type -> affiliate.v1.GetDownlineRequest
-	1, // 4: affiliate.v1.AffiliateService.RegisterReferral:output_type -> affiliate.v1.RegisterReferralResponse
-	3, // 5: affiliate.v1.AffiliateService.AccumulateVolume:output_type -> affiliate.v1.AccumulateVolumeResponse
-	5, // 6: affiliate.v1.AffiliateService.GetAgentRank:output_type -> affiliate.v1.GetAgentRankResponse
-	7, // 7: affiliate.v1.AffiliateService.GetDownline:output_type -> affiliate.v1.GetDownlineResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	2, // 1: affiliate.v1.AffiliateService.GetAgentRank:input_type -> affiliate.v1.GetAgentRankRequest
+	4, // 2: affiliate.v1.AffiliateService.GetDownline:input_type -> affiliate.v1.GetDownlineRequest
+	1, // 3: affiliate.v1.AffiliateService.RegisterReferral:output_type -> affiliate.v1.RegisterReferralResponse
+	3, // 4: affiliate.v1.AffiliateService.GetAgentRank:output_type -> affiliate.v1.GetAgentRankResponse
+	5, // 5: affiliate.v1.AffiliateService.GetDownline:output_type -> affiliate.v1.GetDownlineResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -553,7 +420,7 @@ func file_proto_affiliate_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_affiliate_proto_rawDesc), len(file_proto_affiliate_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

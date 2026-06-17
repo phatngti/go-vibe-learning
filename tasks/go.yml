@@ -1,0 +1,101 @@
+version: '3'
+
+tasks:
+  deps:
+    desc: Download Go dependencies
+    cmds:
+      - go mod download
+
+  tidy:
+    desc: Tidy go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  fmt:
+    desc: Format Go files
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  run:
+    desc: Run a service locally
+    vars:
+      SERVICE: '{{default "user" .SERVICE}}'
+    cmds:
+      - SERVICE_NAME={{.SERVICE}} CONFIG_PATH=./config/{{.SERVICE}}.yaml go run ./cmd/{{.SERVICE}}
+
+  build:
+    desc: Build a service binary
+    vars:
+      SERVICE: '{{default "user" .SERVICE}}'
+      BIN_DIR: '{{default "bin" .BIN_DIR}}'
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -o {{.BIN_DIR}}/{{.SERVICE}} ./cmd/{{.SERVICE}}
+
+  build-all:
+    desc: Build all service binaries
+    cmds:
+      - task: build
+        vars:
+          SERVICE: user
+      - task: build
+        vars:
+          SERVICE: payment
+      - task: build
+        vars:
+          SERVICE: affiliate
+      - task: build
+        vars:
+          SERVICE: settlement
+      - task: build
+        vars:
+          SERVICE: agent
+      - task: build
+        vars:
+          SERVICE: orchestrator
+
+  image:
+    desc: Build a Docker image for a service
+    vars:
+      SERVICE: '{{default "user" .SERVICE}}'
+      IMAGE_REPOSITORY: '{{default "master-go-cqrs" .IMAGE_REPOSITORY}}'
+      IMAGE_TAG: '{{default "local" .IMAGE_TAG}}'
+    cmds:
+      - docker build --target {{.SERVICE}} -t {{.IMAGE_REPOSITORY}}/{{.SERVICE}}:{{.IMAGE_TAG}} .
+
+  image-all:
+    desc: Build Docker images for all services
+    cmds:
+      - task: image
+        vars:
+          SERVICE: user
+      - task: image
+        vars:
+          SERVICE: payment
+      - task: image
+        vars:
+          SERVICE: affiliate
+      - task: image
+        vars:
+          SERVICE: settlement
+      - task: image
+        vars:
+          SERVICE: agent
+      - task: image
+        vars:
+          SERVICE: orchestrator
+
+  clean:
+    desc: Remove local binaries
+    cmds:
+      - rm -rf {{.BIN_DIR}}

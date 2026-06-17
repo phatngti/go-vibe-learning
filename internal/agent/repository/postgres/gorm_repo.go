@@ -64,3 +64,27 @@ func (r *agentRepository) CreateAuditLog(ctx context.Context, db *gorm.DB, log *
 	}
 	return nil
 }
+
+func (r *agentRepository) GetCallbackDelivery(ctx context.Context, transactionID string) (*domain.CallbackDelivery, error) {
+	var delivery domain.CallbackDelivery
+	err := r.db.WithContext(ctx).First(&delivery, "transaction_id = ?", transactionID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load callback delivery: %w", err)
+	}
+	return &delivery, nil
+}
+
+func (r *agentRepository) SaveCallbackDelivery(ctx context.Context, db *gorm.DB, delivery *domain.CallbackDelivery) error {
+	activeDB := r.db
+	if db != nil {
+		activeDB = db
+	}
+	delivery.UpdatedAt = time.Now()
+	if err := activeDB.WithContext(ctx).Save(delivery).Error; err != nil {
+		return fmt.Errorf("failed to save callback delivery: %w", err)
+	}
+	return nil
+}

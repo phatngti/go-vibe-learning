@@ -1,3 +1,6 @@
+// File: internal/platform/postgres/postgres.go
+// Description: GORM PostgreSQL database connection setup, configuration, and Fx lifecycle hooks.
+
 package postgres
 
 import (

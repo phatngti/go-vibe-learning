@@ -1,100 +1,88 @@
+// File: internal/platform/outbox/publisher.go
+// Description: Outbox Publisher daemon running background batch loops to publish claimed outbox events to Kafka.
+
 package outbox
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github/master_go_cqrs/internal/observability/logger"
+	"github/master_go_cqrs/internal/platform/kafka"
 
-	"go.temporal.io/sdk/client"
+	"github.com/google/uuid"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
 type Publisher struct {
-	repo           Repository
-	temporalClient client.Client
-	logger         logger.Factory
-	stopChan       chan struct{}
+	repo     Repository
+	producer kafka.Producer
+	logger   logger.Factory
+	workerID string
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
-func NewPublisher(repo Repository, temporalClient client.Client, l logger.Factory) *Publisher {
-	return &Publisher{
-		repo:           repo,
-		temporalClient: temporalClient,
-		logger:         l,
-		stopChan:       make(chan struct{}),
-	}
+func NewPublisher(repo Repository, producer kafka.Producer, l logger.Factory) *Publisher {
+	return &Publisher{repo: repo, producer: producer, logger: l, workerID: uuid.NewString()}
 }
 
 func (p *Publisher) Start(lifecycle fx.Lifecycle) {
 	lifecycle.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			p.logger.Bg().Info("Starting Outbox Event Publisher background worker")
-			go p.run()
+		OnStart: func(context.Context) error {
+			ctx, cancel := context.WithCancel(context.Background())
+			p.cancel = cancel
+			p.wg.Add(1)
+			go p.run(ctx)
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
-			p.logger.Bg().Info("Stopping Outbox Event Publisher background worker")
-			close(p.stopChan)
+		OnStop: func(context.Context) error {
+			if p.cancel != nil {
+				p.cancel()
+			}
+			p.wg.Wait()
 			return nil
 		},
 	})
 }
 
-func (p *Publisher) run() {
-	ticker := time.NewTicker(1 * time.Second)
+func (p *Publisher) run(ctx context.Context) {
+	defer p.wg.Done()
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-
 	for {
+		if err := p.publishBatch(ctx); err != nil && ctx.Err() == nil {
+			p.logger.Bg().Error("Outbox publish batch failed", zap.Error(err))
+		}
 		select {
-		case <-ticker.C:
-			p.publishPendingEvents()
-		case <-p.stopChan:
+		case <-ctx.Done():
 			return
+		case <-ticker.C:
 		}
 	}
 }
 
-func (p *Publisher) publishPendingEvents() {
-	ctx := context.Background()
-	events, err := p.repo.GetPendingEvents(ctx, 20)
+func (p *Publisher) publishBatch(ctx context.Context) error {
+	events, err := p.repo.Claim(ctx, p.workerID, 20, time.Minute)
 	if err != nil {
-		p.logger.Bg().Error("Failed to fetch pending outbox events", zap.Error(err))
-		return
+		return err
 	}
-
 	for _, event := range events {
-		p.logger.Bg().Info("Publishing outbox event",
-			zap.String("id", event.ID.String()),
-			zap.String("type", event.EventType),
-		)
-
-		var publishErr error
-		switch event.EventType {
-		case "PaymentCompletedEvent":
-			// Trigger Temporal Workflow: PaymentProcessingWorkflow
-			options := client.StartWorkflowOptions{
-				ID:        "payment-processing-flow-" + event.AggregateID,
-				TaskQueue: "payment-processing",
-			}
-			// Trigger the workflow using the Temporal client
-			_, publishErr = p.temporalClient.ExecuteWorkflow(
-				ctx,
-				options,
-				"PaymentProcessingWorkflow",
-				event.Payload, // Pass payload directly
-			)
-		default:
-			p.logger.Bg().Warn("Unknown outbox event type; marking processed", zap.String("type", event.EventType))
+		message := &kafka.Message{
+			ID: event.MessageID, EventType: event.MessageType,
+			AggregateType: event.AggregateType, AggregateID: event.AggregateID,
+			Payload: []byte(event.Payload), OccurredAt: event.CreatedAt,
 		}
-
-		if publishErr != nil {
-			p.logger.Bg().Error("Failed to publish outbox event, retrying later", zap.String("id", event.ID.String()), zap.Error(publishErr))
-			_ = p.repo.MarkAsFailed(ctx, event.ID, publishErr.Error())
-		} else {
-			p.logger.Bg().Info("Successfully published outbox event", zap.String("id", event.ID.String()))
-			_ = p.repo.MarkAsProcessed(ctx, event.ID)
+		if err := p.producer.Publish(ctx, event.Topic, event.MessageKey, message); err != nil {
+			delay := time.Duration(1<<min(event.Attempts, 5)) * time.Second
+			_ = p.repo.MarkRetry(ctx, event.ID, err.Error(), delay)
+			continue
+		}
+		if err := p.repo.MarkProcessed(ctx, event.ID); err != nil {
+			return err
 		}
 	}
+	return nil
 }

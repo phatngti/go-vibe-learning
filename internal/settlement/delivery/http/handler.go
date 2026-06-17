@@ -12,8 +12,6 @@ import (
 	"github/master_go_cqrs/internal/settlement/application/query"
 
 	"github.com/labstack/echo/v4"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -23,7 +21,6 @@ type Handler struct {
 	getBalance        *query.GetBalanceHandler
 	requestWithdrawal *command.RequestWithdrawalHandler
 	adjustCreditLimit *command.AdjustCreditLimitHandler
-	tracer            trace.Tracer
 	authenticate      gatewayauth.Middleware
 }
 
@@ -42,7 +39,6 @@ func NewHandler(params HandlerParams) route.Registrar {
 		getBalance:        params.GetBalance,
 		requestWithdrawal: params.RequestWithdrawal,
 		adjustCreditLimit: params.AdjustCreditLimit,
-		tracer:            otel.Tracer("settlement.delivery.http"),
 		authenticate:      params.TokenAuth,
 	}
 }

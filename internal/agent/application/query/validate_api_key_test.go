@@ -31,6 +31,14 @@ func (r *agentRepoStub) CreateAuditLog(ctx context.Context, db *gorm.DB, log *do
 	return nil
 }
 
+func (r *agentRepoStub) GetCallbackDelivery(context.Context, string) (*domain.CallbackDelivery, error) {
+	return nil, nil
+}
+
+func (r *agentRepoStub) SaveCallbackDelivery(context.Context, *gorm.DB, *domain.CallbackDelivery) error {
+	return nil
+}
+
 func TestValidateAPIKeyHandlerDelegatesToRepository(t *testing.T) {
 	want := &domain.AgentConfig{AgentID: "agent-1", ApiKey: "agg_key_test"}
 	repo := &agentRepoStub{cfg: want}

@@ -1,3 +1,6 @@
+// File: internal/platform/outbox/fx.go
+// Description: Fx dependency injection module configuration for the transactional outbox package.
+
 package outbox
 
 import (
@@ -8,12 +11,8 @@ import (
 
 var Module = fx.Module("outbox",
 	fx.Provide(
-		func(db *postgres.DB) Repository {
-			return NewRepository(db.DB)
-		},
+		func(db *postgres.DB) Repository { return NewRepository(db.DB) },
 		NewPublisher,
 	),
-	fx.Invoke(func(p *Publisher, lc fx.Lifecycle) {
-		p.Start(lc)
-	}),
+	fx.Invoke(func(publisher *Publisher, lifecycle fx.Lifecycle) { publisher.Start(lifecycle) }),
 )

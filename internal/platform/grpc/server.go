@@ -1,3 +1,6 @@
+// File: internal/platform/grpc/server.go
+// Description: Instantiates and controls the lifecycle of the global gRPC server with trace and log interceptors.
+
 package grpc
 
 import (

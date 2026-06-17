@@ -14,12 +14,9 @@ type Tracer struct {
 
 type spanTraceConfig struct {
 	attributes []attribute.KeyValue
-	hooks      []SpanTraceHook
 	spanKind   trace.SpanKind
 	err        *error
 }
-
-type SpanTraceHook func(context.Context, trace.Span)
 
 type SpanTraceOption func(*spanTraceConfig)
 
@@ -53,13 +50,6 @@ func (t Tracer) Trace(ctx *context.Context, label string, options ...SpanTraceOp
 	if len(cfg.attributes) > 0 {
 		span.SetAttributes(cfg.attributes...)
 	}
-	for _, hook := range cfg.hooks {
-		if hook == nil {
-			continue
-		}
-		hook(spanCtx, span)
-	}
-
 	return func() {
 		if cfg.err != nil && *cfg.err != nil {
 			span.RecordError(*cfg.err)
@@ -72,12 +62,6 @@ func (t Tracer) Trace(ctx *context.Context, label string, options ...SpanTraceOp
 func TraceAttributes(attributes ...attribute.KeyValue) SpanTraceOption {
 	return func(cfg *spanTraceConfig) {
 		cfg.attributes = append(cfg.attributes, attributes...)
-	}
-}
-
-func TraceHooks(hooks ...SpanTraceHook) SpanTraceOption {
-	return func(cfg *spanTraceConfig) {
-		cfg.hooks = append(cfg.hooks, hooks...)
 	}
 }
 

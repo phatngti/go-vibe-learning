@@ -7,8 +7,6 @@ import (
 	"github/master_go_cqrs/internal/security/gatewayauth"
 
 	"github.com/labstack/echo/v4"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 )
 
@@ -16,7 +14,6 @@ type Handler struct {
 	logger       logger.Factory
 	checkAuthn   *query.CheckAuthnHandler
 	checkRBAC    *query.CheckRBACHandler
-	tracer       trace.Tracer
 	authenticate gatewayauth.Middleware
 }
 
@@ -33,7 +30,6 @@ func NewHandler(params HandlerParams) route.Registrar {
 		logger:       params.Logger,
 		checkAuthn:   params.CheckAuthn,
 		checkRBAC:    params.CheckRBAC,
-		tracer:       otel.Tracer("accesscontrol.delivery.http"),
 		authenticate: params.TokenAuth,
 	}
 }

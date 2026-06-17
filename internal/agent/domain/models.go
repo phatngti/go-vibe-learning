@@ -27,3 +27,17 @@ type AuditLog struct {
 func (AuditLog) TableName() string {
 	return "public.agent_audit_logs"
 }
+
+type CallbackDelivery struct {
+	TransactionID string    `gorm:"type:text;primaryKey"`
+	AgentID       string    `gorm:"type:text;not null"`
+	CallbackURL   string    `gorm:"type:text"`
+	Status        string    `gorm:"type:text;not null"`
+	Attempts      int       `gorm:"not null;default:0"`
+	LastError     string    `gorm:"type:text"`
+	UpdatedAt     time.Time `gorm:"not null;default:now()"`
+}
+
+func (CallbackDelivery) TableName() string {
+	return "public.callback_deliveries"
+}

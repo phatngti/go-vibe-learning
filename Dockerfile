@@ -33,8 +33,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/agent ./cmd/agent
 FROM builder AS builder-orchestrator
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/orchestrator ./cmd/orchestrator
 
-FROM builder AS builder-app
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/app ./cmd/app
+FROM builder AS builder-user
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/user ./cmd/user
 
 # ==========================================
 # 2. Runtime Stage
@@ -47,7 +47,7 @@ RUN apk add --no-cache ca-certificates tzdata
 COPY config/ ./config/
 
 # Default environments
-ENV CONFIG_PATH=/root/config/app.yaml
+ENV CONFIG_PATH=/root/config/user.yaml
 
 # Payment Service Target
 FROM runtime AS payment
@@ -88,10 +88,10 @@ ENV SERVICE_NAME=orchestrator
 ENV CONFIG_PATH=/root/config/orchestrator.yaml
 ENTRYPOINT ["/usr/local/bin/orchestrator"]
 
-# App / HTTP API Target
-FROM runtime AS app
-COPY --from=builder-app /bin/app /usr/local/bin/app
-ENV SERVICE_NAME=app
-ENV CONFIG_PATH=/root/config/app.yaml
+# User / HTTP API Target
+FROM runtime AS user
+COPY --from=builder-user /bin/user /usr/local/bin/user
+ENV SERVICE_NAME=user
+ENV CONFIG_PATH=/root/config/user.yaml
 EXPOSE 8889
-ENTRYPOINT ["/usr/local/bin/app"]
+ENTRYPOINT ["/usr/local/bin/user"]

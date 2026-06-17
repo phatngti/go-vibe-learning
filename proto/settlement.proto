@@ -6,20 +6,6 @@ import "google/api/annotations.proto";
 
 option go_package = "github/master_go_cqrs/internal/genproto/settlement;settlementv1";
 
-message CalculateAndCreditCommissionRequest {
-  string agent_id = 1;
-  double transaction_amount = 2;
-  string rank = 3;
-  string transaction_id = 4;
-}
-
-message CalculateAndCreditCommissionResponse {
-  string agent_id = 1;
-  double commission_amount = 2;
-  double new_balance = 3;
-  string status = 4;
-}
-
 message GetAgentBalanceRequest {
   string agent_id = 1;
 }
@@ -57,7 +43,6 @@ message AdjustCreditLimitResponse {
 }
 
 service SettlementService {
-  rpc CalculateAndCreditCommission(CalculateAndCreditCommissionRequest) returns (CalculateAndCreditCommissionResponse);
   rpc GetAgentBalance(GetAgentBalanceRequest) returns (GetAgentBalanceResponse) {
     option (google.api.http) = {
       get: "/api/v1/settlement/balance/{agent_id}"

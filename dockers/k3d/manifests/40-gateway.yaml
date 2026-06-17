@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: swagger-ui
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: swagger-ui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swagger-ui
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: swagger-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: swagger-ui
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: swagger-ui
+          image: swaggerapi/swagger-ui:v5.17.14
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: BASE_URL
+              value: /api/v1/swagger
+            - name: SWAGGER_JSON
+              value: /etc/swagger/swagger.json
+          volumeMounts:
+            - name: envoy-swagger
+              mountPath: /etc/swagger/swagger.json
+              subPath: envoy.swagger.json
+              readOnly: true
+      volumes:
+        - name: envoy-swagger
+          configMap:
+            name: envoy-swagger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: http
+      port: 8888
+      targetPort: http
+    - name: admin
+      port: 9901
+      targetPort: admin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: api-gateway
+          image: envoyproxy/envoy:v1.32-latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - envoy
+            - -c
+            - /etc/envoy/envoy.yaml
+            - --service-cluster
+            - master-go-cqrs-api-gateway
+            - --service-node
+            - k3d
+          ports:
+            - name: http
+              containerPort: 8888
+            - name: admin
+              containerPort: 9901
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy/envoy.yaml
+              subPath: envoy.yaml
+              readOnly: true
+            - name: envoy-proto
+              mountPath: /etc/envoy/proto.pb
+              subPath: proto.pb
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: envoy-config
+        - name: envoy-proto
+          configMap:
+            name: envoy-proto
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: master-go-cqrs
+  namespace: master-go-cqrs
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: master-go-cqrs
+  namespace: master-go-cqrs
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - master-go-cqrs
+  http:
+    - route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8888

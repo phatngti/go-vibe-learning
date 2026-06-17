@@ -14,9 +14,9 @@ func TestUnaryServerInterceptorProtectsConfiguredMethod(t *testing.T) {
 	interceptor := UnaryServerInterceptor()
 
 	_, err := interceptor(ctx, "request", &grpc.UnaryServerInfo{FullMethod: "/payment.v1.PaymentService/InitiatePayment"}, func(ctx context.Context, req any) (any, error) {
-		user, ok := UserFromContext(ctx)
+		user, ok := ctx.Value(userContextKey{}).(User)
 		if !ok || user.ID != "user-1" {
-			t.Fatalf("UserFromContext() = %+v, %v; want user-1", user, ok)
+			t.Fatalf("context user = %+v, %v; want user-1", user, ok)
 		}
 		return "ok", nil
 	})
@@ -28,7 +28,7 @@ func TestUnaryServerInterceptorProtectsConfiguredMethod(t *testing.T) {
 func TestUnaryServerInterceptorLeavesInternalMethodUnblocked(t *testing.T) {
 	interceptor := UnaryServerInterceptor()
 
-	_, err := interceptor(context.Background(), "request", &grpc.UnaryServerInfo{FullMethod: "/affiliate.v1.AffiliateService/AccumulateVolume"}, func(ctx context.Context, req any) (any, error) {
+	_, err := interceptor(context.Background(), "request", &grpc.UnaryServerInfo{FullMethod: "/payment.v1.PaymentService/ProcessPayment"}, func(ctx context.Context, req any) (any, error) {
 		return "ok", nil
 	})
 	if err != nil {

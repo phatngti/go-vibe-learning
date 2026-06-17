@@ -20,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	AffiliateService_RegisterReferral_FullMethodName = "/affiliate.v1.AffiliateService/RegisterReferral"
-	AffiliateService_AccumulateVolume_FullMethodName = "/affiliate.v1.AffiliateService/AccumulateVolume"
 	AffiliateService_GetAgentRank_FullMethodName     = "/affiliate.v1.AffiliateService/GetAgentRank"
 	AffiliateService_GetDownline_FullMethodName      = "/affiliate.v1.AffiliateService/GetDownline"
 )
@@ -30,7 +29,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AffiliateServiceClient interface {
 	RegisterReferral(ctx context.Context, in *RegisterReferralRequest, opts ...grpc.CallOption) (*RegisterReferralResponse, error)
-	AccumulateVolume(ctx context.Context, in *AccumulateVolumeRequest, opts ...grpc.CallOption) (*AccumulateVolumeResponse, error)
 	GetAgentRank(ctx context.Context, in *GetAgentRankRequest, opts ...grpc.CallOption) (*GetAgentRankResponse, error)
 	GetDownline(ctx context.Context, in *GetDownlineRequest, opts ...grpc.CallOption) (*GetDownlineResponse, error)
 }
@@ -47,16 +45,6 @@ func (c *affiliateServiceClient) RegisterReferral(ctx context.Context, in *Regis
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterReferralResponse)
 	err := c.cc.Invoke(ctx, AffiliateService_RegisterReferral_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *affiliateServiceClient) AccumulateVolume(ctx context.Context, in *AccumulateVolumeRequest, opts ...grpc.CallOption) (*AccumulateVolumeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AccumulateVolumeResponse)
-	err := c.cc.Invoke(ctx, AffiliateService_AccumulateVolume_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +76,6 @@ func (c *affiliateServiceClient) GetDownline(ctx context.Context, in *GetDownlin
 // for forward compatibility.
 type AffiliateServiceServer interface {
 	RegisterReferral(context.Context, *RegisterReferralRequest) (*RegisterReferralResponse, error)
-	AccumulateVolume(context.Context, *AccumulateVolumeRequest) (*AccumulateVolumeResponse, error)
 	GetAgentRank(context.Context, *GetAgentRankRequest) (*GetAgentRankResponse, error)
 	GetDownline(context.Context, *GetDownlineRequest) (*GetDownlineResponse, error)
 	mustEmbedUnimplementedAffiliateServiceServer()
@@ -103,9 +90,6 @@ type UnimplementedAffiliateServiceServer struct{}
 
 func (UnimplementedAffiliateServiceServer) RegisterReferral(context.Context, *RegisterReferralRequest) (*RegisterReferralResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterReferral not implemented")
-}
-func (UnimplementedAffiliateServiceServer) AccumulateVolume(context.Context, *AccumulateVolumeRequest) (*AccumulateVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method AccumulateVolume not implemented")
 }
 func (UnimplementedAffiliateServiceServer) GetAgentRank(context.Context, *GetAgentRankRequest) (*GetAgentRankResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAgentRank not implemented")
@@ -148,24 +132,6 @@ func _AffiliateService_RegisterReferral_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AffiliateServiceServer).RegisterReferral(ctx, req.(*RegisterReferralRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AffiliateService_AccumulateVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AccumulateVolumeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AffiliateServiceServer).AccumulateVolume(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AffiliateService_AccumulateVolume_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AffiliateServiceServer).AccumulateVolume(ctx, req.(*AccumulateVolumeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -216,10 +182,6 @@ var AffiliateService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RegisterReferral",
 			Handler:    _AffiliateService_RegisterReferral_Handler,
-		},
-		{
-			MethodName: "AccumulateVolume",
-			Handler:    _AffiliateService_AccumulateVolume_Handler,
 		},
 		{
 			MethodName: "GetAgentRank",

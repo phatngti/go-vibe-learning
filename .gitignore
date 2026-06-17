@@ -1,0 +1,12 @@
+# Local runtime state
+.dev/
+
+# Build outputs
+bin/
+
+# OS/editor noise
+.DS_Store
+
+# Test and coverage artifacts
+*.test
+coverage.out

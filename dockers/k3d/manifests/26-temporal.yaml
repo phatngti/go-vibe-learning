@@ -1,0 +1,326 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-config
+  namespace: master-go-cqrs
+data:
+  config_template.yaml: |-
+    # enable-template
+    log:
+      stdout: true
+      level: info
+
+    persistence:
+      defaultStore: postgres-default
+      visibilityStore: postgres-visibility
+      numHistoryShards: 4
+      datastores:
+        postgres-default:
+          sql:
+            pluginName: postgres12
+            databaseName: master_go_cqrs_temporal
+            connectAddr: postgres:5432
+            connectProtocol: tcp
+            user: master_go_cqrs_temporal_user
+            password: {{ env "TEMPORAL_DEFAULT_STORE_PASSWORD" | quote }}
+            maxConns: 20
+            maxIdleConns: 20
+            maxConnLifetime: 1h
+        postgres-visibility:
+          sql:
+            pluginName: postgres12
+            databaseName: master_go_cqrs_temporal_visibility
+            connectAddr: postgres:5432
+            connectProtocol: tcp
+            user: master_go_cqrs_temporal_user
+            password: {{ env "TEMPORAL_VISIBILITY_STORE_PASSWORD" | quote }}
+            maxConns: 5
+            maxIdleConns: 5
+            maxConnLifetime: 1h
+
+    global:
+      membership:
+        name: temporal
+        maxJoinDuration: 30s
+        broadcastAddress: {{ env "POD_IP" | quote }}
+      pprof:
+        port: 7936
+      metrics:
+        prometheus:
+          framework: tally
+          timerType: histogram
+          listenAddress: 0.0.0.0:8000
+
+    services:
+      frontend:
+        rpc:
+          grpcPort: 7233
+          httpPort: 7243
+          membershipPort: 6933
+          bindOnIP: 0.0.0.0
+      history:
+        rpc:
+          grpcPort: 7234
+          membershipPort: 6934
+          bindOnIP: 0.0.0.0
+      matching:
+        rpc:
+          grpcPort: 7235
+          membershipPort: 6935
+          bindOnIP: 0.0.0.0
+      worker:
+        rpc:
+          grpcPort: 7239
+          membershipPort: 6939
+          bindOnIP: 0.0.0.0
+
+    clusterMetadata:
+      enableGlobalNamespace: false
+      failoverVersionIncrement: 10
+      masterClusterName: active
+      currentClusterName: active
+      clusterInformation:
+        active:
+          enabled: true
+          initialFailoverVersion: 1
+          rpcName: frontend
+          rpcAddress: 127.0.0.1:7233
+          httpAddress: 127.0.0.1:7243
+
+    dcRedirectionPolicy:
+      policy: noop
+      toDC: ""
+
+    archival:
+      history:
+        state: disabled
+        enableRead: false
+      visibility:
+        state: disabled
+        enableRead: false
+
+    publicClient:
+      hostPort: 127.0.0.1:7233
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-schema
+  namespace: master-go-cqrs
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: temporal-schema
+        app.kubernetes.io/part-of: master-go-cqrs
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: schema
+          image: temporalio/admin-tools:1.31.1
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-ec"]
+          args:
+            - |
+              migrate() {
+                database="$1"
+                schema="$2"
+                temporal-sql-tool --plugin postgres12 --endpoint postgres --port 5432 \
+                  --user "$SQL_USER" --password "$SQL_PASSWORD" --database "$database" \
+                  setup-schema --version 0.0 || true
+                temporal-sql-tool --plugin postgres12 --endpoint postgres --port 5432 \
+                  --user "$SQL_USER" --password "$SQL_PASSWORD" --database "$database" \
+                  update-schema --schema-dir "/etc/temporal/schema/postgresql/v12/$schema/versioned"
+              }
+              migrate "$TEMPORAL_DATABASE" temporal
+              migrate "$TEMPORAL_VISIBILITY_DATABASE" visibility
+          env:
+            - name: SQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: temporal-db-user
+            - name: SQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: temporal-db-password
+            - name: TEMPORAL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: temporal-db-name
+            - name: TEMPORAL_VISIBILITY_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: temporal-visibility-db-name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: temporal
+  ports:
+    - name: grpc
+      port: 7233
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: temporal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: temporal
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: temporal
+          image: temporalio/server:1.31.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 7233
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: TEMPORAL_SERVER_CONFIG_FILE_PATH
+              value: /etc/temporal/config/config_template.yaml
+            - name: TEMPORAL_ALLOW_NO_AUTH
+              value: "true"
+            - name: TEMPORAL_DEFAULT_STORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: temporal-db-password
+            - name: TEMPORAL_VISIBILITY_STORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: temporal-db-password
+          volumeMounts:
+            - name: config
+              mountPath: /etc/temporal/config/config_template.yaml
+              subPath: config_template.yaml
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+        - name: admin-tools
+          image: temporalio/admin-tools:1.31.1
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "trap : TERM INT; sleep infinity & wait"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: temporal-config
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-namespace
+  namespace: master-go-cqrs
+spec:
+  backoffLimit: 12
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: temporal-namespace
+        app.kubernetes.io/part-of: master-go-cqrs
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: namespace
+          image: temporalio/admin-tools:1.31.1
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-ec"]
+          args:
+            - |
+              until temporal operator namespace describe --address temporal:7233 --namespace master-go-cqrs >/dev/null 2>&1; do
+                if temporal operator namespace create --address temporal:7233 --namespace master-go-cqrs --retention 72h; then
+                  exit 0
+                fi
+                sleep 5
+              done
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-ui
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: temporal-ui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-ui
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: temporal-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: temporal-ui
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: temporal-ui
+          image: temporalio/ui:2.51.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+            - name: TEMPORAL_CORS_ORIGINS
+              value: http://temporal-ui.master-go-cqrs.svc.cluster.local:8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3

@@ -19,17 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SettlementService_CalculateAndCreditCommission_FullMethodName = "/settlement.v1.SettlementService/CalculateAndCreditCommission"
-	SettlementService_GetAgentBalance_FullMethodName              = "/settlement.v1.SettlementService/GetAgentBalance"
-	SettlementService_RequestWithdrawal_FullMethodName            = "/settlement.v1.SettlementService/RequestWithdrawal"
-	SettlementService_AdjustCreditLimit_FullMethodName            = "/settlement.v1.SettlementService/AdjustCreditLimit"
+	SettlementService_GetAgentBalance_FullMethodName   = "/settlement.v1.SettlementService/GetAgentBalance"
+	SettlementService_RequestWithdrawal_FullMethodName = "/settlement.v1.SettlementService/RequestWithdrawal"
+	SettlementService_AdjustCreditLimit_FullMethodName = "/settlement.v1.SettlementService/AdjustCreditLimit"
 )
 
 // SettlementServiceClient is the client API for SettlementService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SettlementServiceClient interface {
-	CalculateAndCreditCommission(ctx context.Context, in *CalculateAndCreditCommissionRequest, opts ...grpc.CallOption) (*CalculateAndCreditCommissionResponse, error)
 	GetAgentBalance(ctx context.Context, in *GetAgentBalanceRequest, opts ...grpc.CallOption) (*GetAgentBalanceResponse, error)
 	RequestWithdrawal(ctx context.Context, in *RequestWithdrawalRequest, opts ...grpc.CallOption) (*RequestWithdrawalResponse, error)
 	AdjustCreditLimit(ctx context.Context, in *AdjustCreditLimitRequest, opts ...grpc.CallOption) (*AdjustCreditLimitResponse, error)
@@ -41,16 +39,6 @@ type settlementServiceClient struct {
 
 func NewSettlementServiceClient(cc grpc.ClientConnInterface) SettlementServiceClient {
 	return &settlementServiceClient{cc}
-}
-
-func (c *settlementServiceClient) CalculateAndCreditCommission(ctx context.Context, in *CalculateAndCreditCommissionRequest, opts ...grpc.CallOption) (*CalculateAndCreditCommissionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CalculateAndCreditCommissionResponse)
-	err := c.cc.Invoke(ctx, SettlementService_CalculateAndCreditCommission_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *settlementServiceClient) GetAgentBalance(ctx context.Context, in *GetAgentBalanceRequest, opts ...grpc.CallOption) (*GetAgentBalanceResponse, error) {
@@ -87,7 +75,6 @@ func (c *settlementServiceClient) AdjustCreditLimit(ctx context.Context, in *Adj
 // All implementations must embed UnimplementedSettlementServiceServer
 // for forward compatibility.
 type SettlementServiceServer interface {
-	CalculateAndCreditCommission(context.Context, *CalculateAndCreditCommissionRequest) (*CalculateAndCreditCommissionResponse, error)
 	GetAgentBalance(context.Context, *GetAgentBalanceRequest) (*GetAgentBalanceResponse, error)
 	RequestWithdrawal(context.Context, *RequestWithdrawalRequest) (*RequestWithdrawalResponse, error)
 	AdjustCreditLimit(context.Context, *AdjustCreditLimitRequest) (*AdjustCreditLimitResponse, error)
@@ -101,9 +88,6 @@ type SettlementServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSettlementServiceServer struct{}
 
-func (UnimplementedSettlementServiceServer) CalculateAndCreditCommission(context.Context, *CalculateAndCreditCommissionRequest) (*CalculateAndCreditCommissionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CalculateAndCreditCommission not implemented")
-}
 func (UnimplementedSettlementServiceServer) GetAgentBalance(context.Context, *GetAgentBalanceRequest) (*GetAgentBalanceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAgentBalance not implemented")
 }
@@ -132,24 +116,6 @@ func RegisterSettlementServiceServer(s grpc.ServiceRegistrar, srv SettlementServ
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&SettlementService_ServiceDesc, srv)
-}
-
-func _SettlementService_CalculateAndCreditCommission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CalculateAndCreditCommissionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SettlementServiceServer).CalculateAndCreditCommission(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SettlementService_CalculateAndCreditCommission_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SettlementServiceServer).CalculateAndCreditCommission(ctx, req.(*CalculateAndCreditCommissionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _SettlementService_GetAgentBalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -213,10 +179,6 @@ var SettlementService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "settlement.v1.SettlementService",
 	HandlerType: (*SettlementServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "CalculateAndCreditCommission",
-			Handler:    _SettlementService_CalculateAndCreditCommission_Handler,
-		},
 		{
 			MethodName: "GetAgentBalance",
 			Handler:    _SettlementService_GetAgentBalance_Handler,

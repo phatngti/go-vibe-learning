@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GoLand / JetBrains Live Templates for Swaggo Comment Generation.
+
+  Installation:
+    1. Open GoLand → Settings → Editor → Live Templates
+    2. Click the gear icon → Import → Select this XML file
+    3. Templates will appear under the "Swaggo" group
+
+  Usage:
+    - Type the abbreviation (e.g., "sget") and press Tab to expand
+    - Use Tab to navigate between placeholders
+-->
+<templateSet group="Swaggo">
+
+  <!-- Full GET handler template -->
+  <template name="sget"
+            value="// $FUNC_NAME$ godoc&#10;//&#10;//&#9;@Summary&#9;&#9;$SUMMARY$&#10;//&#9;@Description&#9;$DESCRIPTION$&#10;//&#9;@Tags&#9;&#9;&#9;$TAG$&#10;//&#9;@Produce&#9;&#9;json&#10;//&#9;@Success&#9;&#9;200&#9;&#9;{object}&#9;$RESPONSE_TYPE$&#9;&quot;$SUCCESS_MSG$&quot;&#10;//&#9;@Failure&#9;&#9;500&#9;&#9;{object}&#9;response.ErrorResponse&#9;&quot;Internal error&quot;&#10;//&#9;@Security&#9;&#9;BearerAuth&#10;//&#9;@Router&#9;&#9;&#9;$PATH$ [get]"
+            description="Swaggo GET handler annotation"
+            toReformat="false"
+            toShortenFQNames="false">
+    <variable name="FUNC_NAME" expression="" defaultValue="&quot;handlerName&quot;" alwaysStopAt="true"/>
+    <variable name="SUMMARY" expression="" defaultValue="&quot;Summary&quot;" alwaysStopAt="true"/>
+    <variable name="DESCRIPTION" expression="" defaultValue="&quot;Description&quot;" alwaysStopAt="true"/>
+    <variable name="TAG" expression="" defaultValue="&quot;tag&quot;" alwaysStopAt="true"/>
+    <variable name="RESPONSE_TYPE" expression="" defaultValue="&quot;dto.ResponseType&quot;" alwaysStopAt="true"/>
+    <variable name="SUCCESS_MSG" expression="" defaultValue="&quot;OK&quot;" alwaysStopAt="true"/>
+    <variable name="PATH" expression="" defaultValue="&quot;/path&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="GO" value="true"/>
+    </context>
+  </template>
+
+  <!-- Full POST handler template with body param -->
+  <template name="spost"
+            value="// $FUNC_NAME$ godoc&#10;//&#10;//&#9;@Summary&#9;&#9;$SUMMARY$&#10;//&#9;@Description&#9;$DESCRIPTION$&#10;//&#9;@Tags&#9;&#9;&#9;$TAG$&#10;//&#9;@Accept&#9;&#9;&#9;json&#10;//&#9;@Produce&#9;&#9;json&#10;//&#9;@Param&#9;&#9;&#9;request&#9;body&#9;&#9;$BODY_TYPE$&#9;true&#9;&quot;Request payload&quot;&#10;//&#9;@Success&#9;&#9;201&#9;&#9;{object}&#9;$RESPONSE_TYPE$&#9;&quot;$SUCCESS_MSG$&quot;&#10;//&#9;@Failure&#9;&#9;400&#9;&#9;{object}&#9;response.ErrorResponse&#9;&quot;Bad request&quot;&#10;//&#9;@Failure&#9;&#9;500&#9;&#9;{object}&#9;response.ErrorResponse&#9;&quot;Internal error&quot;&#10;//&#9;@Security&#9;&#9;BearerAuth&#10;//&#9;@Router&#9;&#9;&#9;$PATH$ [post]"
+            description="Swaggo POST handler annotation with body"
+            toReformat="false"
+            toShortenFQNames="false">
+    <variable name="FUNC_NAME" expression="" defaultValue="&quot;handlerName&quot;" alwaysStopAt="true"/>
+    <variable name="SUMMARY" expression="" defaultValue="&quot;Summary&quot;" alwaysStopAt="true"/>
+    <variable name="DESCRIPTION" expression="" defaultValue="&quot;Description&quot;" alwaysStopAt="true"/>
+    <variable name="TAG" expression="" defaultValue="&quot;tag&quot;" alwaysStopAt="true"/>
+    <variable name="BODY_TYPE" expression="" defaultValue="&quot;dto.RequestType&quot;" alwaysStopAt="true"/>
+    <variable name="RESPONSE_TYPE" expression="" defaultValue="&quot;dto.ResponseType&quot;" alwaysStopAt="true"/>
+    <variable name="SUCCESS_MSG" expression="" defaultValue="&quot;Created&quot;" alwaysStopAt="true"/>
+    <variable name="PATH" expression="" defaultValue="&quot;/path&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="GO" value="true"/>
+    </context>
+  </template>
+
+  <!-- GET with path param template -->
+  <template name="sgetid"
+            value="// $FUNC_NAME$ godoc&#10;//&#10;//&#9;@Summary&#9;&#9;$SUMMARY$&#10;//&#9;@Description&#9;$DESCRIPTION$&#10;//&#9;@Tags&#9;&#9;&#9;$TAG$&#10;//&#9;@Produce&#9;&#9;json&#10;//&#9;@Param&#9;&#9;&#9;$PARAM_NAME$&#9;path&#9;&#9;$PARAM_TYPE$&#9;true&#9;&quot;$PARAM_DESC$&quot;&#10;//&#9;@Success&#9;&#9;200&#9;&#9;{object}&#9;$RESPONSE_TYPE$&#9;&quot;$SUCCESS_MSG$&quot;&#10;//&#9;@Failure&#9;&#9;404&#9;&#9;{object}&#9;response.ErrorResponse&#9;&quot;Not found&quot;&#10;//&#9;@Security&#9;&#9;BearerAuth&#10;//&#9;@Router&#9;&#9;&#9;$PATH$ [get]"
+            description="Swaggo GET handler with path parameter"
+            toReformat="false"
+            toShortenFQNames="false">
+    <variable name="FUNC_NAME" expression="" defaultValue="&quot;handlerName&quot;" alwaysStopAt="true"/>
+    <variable name="SUMMARY" expression="" defaultValue="&quot;Summary&quot;" alwaysStopAt="true"/>
+    <variable name="DESCRIPTION" expression="" defaultValue="&quot;Description&quot;" alwaysStopAt="true"/>
+    <variable name="TAG" expression="" defaultValue="&quot;tag&quot;" alwaysStopAt="true"/>
+    <variable name="PARAM_NAME" expression="" defaultValue="&quot;id&quot;" alwaysStopAt="true"/>
+    <variable name="PARAM_TYPE" expression="" defaultValue="&quot;string&quot;" alwaysStopAt="true"/>
+    <variable name="PARAM_DESC" expression="" defaultValue="&quot;Resource ID&quot;" alwaysStopAt="true"/>
+    <variable name="RESPONSE_TYPE" expression="" defaultValue="&quot;dto.ResponseType&quot;" alwaysStopAt="true"/>
+    <variable name="SUCCESS_MSG" expression="" defaultValue="&quot;OK&quot;" alwaysStopAt="true"/>
+    <variable name="PATH" expression="" defaultValue="&quot;/resource/{id}&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="GO" value="true"/>
+    </context>
+  </template>
+
+  <!-- Minimal/empty template -->
+  <template name="swag"
+            value="// $FUNC_NAME$ godoc&#10;//&#10;//&#9;@Summary&#9;&#9;$SUMMARY$&#10;//&#9;@Description&#9;$DESCRIPTION$&#10;//&#9;@Tags&#9;&#9;&#9;$TAG$&#10;//&#9;@Accept&#9;&#9;&#9;json&#10;//&#9;@Produce&#9;&#9;json&#10;//&#9;@Success&#9;&#9;$STATUS$&#9;&#9;{object}&#9;$RESPONSE_TYPE$&#9;&quot;$SUCCESS_MSG$&quot;&#10;//&#9;@Failure&#9;&#9;500&#9;&#9;{object}&#9;response.ErrorResponse&#9;&quot;Internal error&quot;&#10;//&#9;@Router&#9;&#9;&#9;$PATH$ [$METHOD$]"
+            description="Swaggo general handler annotation"
+            toReformat="false"
+            toShortenFQNames="false">
+    <variable name="FUNC_NAME" expression="" defaultValue="&quot;handlerName&quot;" alwaysStopAt="true"/>
+    <variable name="SUMMARY" expression="" defaultValue="&quot;Summary&quot;" alwaysStopAt="true"/>
+    <variable name="DESCRIPTION" expression="" defaultValue="&quot;Description&quot;" alwaysStopAt="true"/>
+    <variable name="TAG" expression="" defaultValue="&quot;tag&quot;" alwaysStopAt="true"/>
+    <variable name="STATUS" expression="" defaultValue="&quot;200&quot;" alwaysStopAt="true"/>
+    <variable name="RESPONSE_TYPE" expression="" defaultValue="&quot;dto.ResponseType&quot;" alwaysStopAt="true"/>
+    <variable name="SUCCESS_MSG" expression="" defaultValue="&quot;OK&quot;" alwaysStopAt="true"/>
+    <variable name="PATH" expression="" defaultValue="&quot;/path&quot;" alwaysStopAt="true"/>
+    <variable name="METHOD" expression="" defaultValue="&quot;get&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="GO" value="true"/>
+    </context>
+  </template>
+
+</templateSet>

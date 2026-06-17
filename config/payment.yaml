@@ -1,6 +1,6 @@
 postgres:
-  host: "127.0.0.1"
-  port: "15432"
+  host: "postgres.master-go-cqrs.svc.cluster.local"
+  port: "5432"
   user: "master_go_cqrs_payment_user"
   password: "master_go_cqrs_payment_password"
   dbname: "master_go_cqrs_payment"
@@ -17,13 +17,24 @@ gateway:
   publicBaseUrl: "http://localhost:8888"
 
 keycloak:
-  endpoint: "http://localhost:8080"
+  endpoint: "http://keycloak.master-go-cqrs.svc.cluster.local:8080"
   clientId: "master-go-cqrs"
-  clientSecret: "master_go_cqrs_secret"
-  publicKey: ""
+  clientSecret: "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
   customHeaderName: "Authorization"
   realm: "backend"
 
 otel:
-  endpoint: "localhost:4318"
+  endpoint: "otel.master-go-cqrs.svc.cluster.local:4318"
   service: "payment"
+
+kafka:
+  brokers:
+    - "kafka.master-go-cqrs.svc.cluster.local:9092"
+  topics:
+    paymentEvents: "payments.events"
+    affiliateCommands: "affiliate.commands"
+    affiliateEvents: "affiliate.events"
+    settlementCommands: "settlement.commands"
+    settlementEvents: "settlement.events"
+    agentCommands: "agent.commands"
+    agentEvents: "agent.events"

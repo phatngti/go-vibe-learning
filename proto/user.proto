@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github/master_go_cqrs/internal/genproto/user;userv1";
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  string first_name = 4;
+  string last_name = 5;
+  bool email_verified = 6;
+  bool enabled = 7;
+  string identity_provider = 8;
+}
+
+message GetUserByProviderIDRequest {
+  string identity_provider = 1;
+  string identity_provider_user_id = 2;
+}
+
+message ListUsersRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListUsersResponse {
+  repeated GetUserResponse users = 1;
+  int32 total = 2;
+}
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}"
+    };
+  }
+
+  rpc GetUserByProviderID(GetUserByProviderIDRequest) returns (GetUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/provider/{identity_provider}/{identity_provider_user_id}"
+    };
+  }
+
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users"
+    };
+  }
+}

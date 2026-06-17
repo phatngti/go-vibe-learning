@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,13 +9,30 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+const (
+	OrchestratorEngineSaga     = "saga"
+	OrchestratorEngineTemporal = "temporal"
+)
+
+type KafkaTopics struct {
+	PaymentInitiatedEvents string `yaml:"paymentInitiatedEvents" env:"KAFKA_TOPIC_PAYMENT_INITIATED_EVENTS" env-default:"payments.initiated"`
+	PaymentEvents          string `yaml:"paymentEvents" env:"KAFKA_TOPIC_PAYMENT_EVENTS" env-default:"payments.events"`
+	AffiliateCommands  string `yaml:"affiliateCommands" env:"KAFKA_TOPIC_AFFILIATE_COMMANDS" env-default:"affiliate.commands"`
+	AffiliateEvents    string `yaml:"affiliateEvents" env:"KAFKA_TOPIC_AFFILIATE_EVENTS" env-default:"affiliate.events"`
+	SettlementCommands string `yaml:"settlementCommands" env:"KAFKA_TOPIC_SETTLEMENT_COMMANDS" env-default:"settlement.commands"`
+	SettlementEvents   string `yaml:"settlementEvents" env:"KAFKA_TOPIC_SETTLEMENT_EVENTS" env-default:"settlement.events"`
+	AgentCommands      string `yaml:"agentCommands" env:"KAFKA_TOPIC_AGENT_COMMANDS" env-default:"agent.commands"`
+	AgentEvents        string `yaml:"agentEvents" env:"KAFKA_TOPIC_AGENT_EVENTS" env-default:"agent.events"`
+	UserEvents         string `yaml:"userEvents" env:"KAFKA_TOPIC_USER_EVENTS" env-default:"user.events"`
+}
+
 type Config struct {
 	Postgres struct {
-		Host     string `yaml:"host" env-default:"127.0.0.1"`
-		Port     string `yaml:"port" env-default:"5432"`
-		User     string `yaml:"user" env-default:"postgres"`
-		Password string `yaml:"password" env-default:"password"`
-		DBName   string `yaml:"dbname" env-default:"postgres"`
+		Host     string `yaml:"host" env:"POSTGRES_HOST" env-default:"127.0.0.1"`
+		Port     string `yaml:"port" env:"POSTGRES_PORT" env-default:"5432"`
+		User     string `yaml:"user" env:"POSTGRES_USER" env-default:"postgres"`
+		Password string `yaml:"password" env:"POSTGRES_PASSWORD" env-default:"password"`
+		DBName   string `yaml:"dbname" env:"POSTGRES_DBNAME" env-default:"postgres"`
 	} `yaml:"postgres"`
 
 	Logger struct {
@@ -24,7 +42,7 @@ type Config struct {
 	} `yaml:"logger"`
 
 	Server struct {
-		Port int `yaml:"port" env-default:"8080"`
+		Port int `yaml:"port" env:"SERVER_PORT" env-default:"8080"`
 	} `yaml:"server"`
 
 	Gateway struct {
@@ -35,7 +53,6 @@ type Config struct {
 		Endpoint     string `yaml:"endpoint" env:"KEYCLOAK_ENDPOINT" env-default:"http://localhost:8080"`
 		ClientID     string `yaml:"clientId" env:"KEYCLOAK_CLIENT_ID"`
 		ClientSecret string `yaml:"clientSecret" env:"KEYCLOAK_CLIENT_SECRET"`
-		PublicKey    string `yaml:"publicKey" env:"KEYCLOAK_PUBLIC_KEY"`
 		Realm        string `yaml:"realm" env:"KEYCLOAK_REALM"`
 		CustomHeader string `yaml:"customHeaderName" env:"KEYCLOAK_CUSTOM_HEADER_NAME"`
 	} `yaml:"keycloak"`
@@ -44,6 +61,20 @@ type Config struct {
 		Endpoint string `yaml:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT" env-default:"localhost:4318"`
 		Service  string `yaml:"service" env:"OTEL_SERVICE_NAME" env-default:"app"`
 	} `yaml:"otel"`
+
+	Kafka struct {
+		Brokers []string    `yaml:"brokers" env:"KAFKA_BROKERS" env-separator:"," env-default:"localhost:9092"`
+		Topics  KafkaTopics `yaml:"topics"`
+	} `yaml:"kafka"`
+
+	Orchestrator struct {
+		Engine   string `yaml:"engine" env:"ORCHESTRATOR_ENGINE" env-default:"saga"`
+		Temporal struct {
+			Address   string `yaml:"address" env:"TEMPORAL_ADDRESS" env-default:"localhost:7233"`
+			Namespace string `yaml:"namespace" env:"TEMPORAL_NAMESPACE" env-default:"master-go-cqrs"`
+			TaskQueue string `yaml:"taskQueue" env:"TEMPORAL_TASK_QUEUE" env-default:"payment-orchestration"`
+		} `yaml:"temporal"`
+	} `yaml:"orchestrator"`
 }
 
 func NewConfig() (*Config, error) {
@@ -63,7 +94,32 @@ func NewConfig() (*Config, error) {
 	if tracesEndpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")); tracesEndpoint != "" {
 		config.Otel.Endpoint = tracesEndpoint
 	}
+	if err := config.ValidateOrchestrator(); err != nil {
+		return nil, err
+	}
 	return &config, nil
+}
+
+func (c *Config) ValidateOrchestrator() error {
+	c.Orchestrator.Engine = strings.ToLower(strings.TrimSpace(c.Orchestrator.Engine))
+	switch c.Orchestrator.Engine {
+	case OrchestratorEngineSaga:
+		return nil
+	case OrchestratorEngineTemporal:
+		if strings.TrimSpace(c.Orchestrator.Temporal.Address) == "" {
+			return fmt.Errorf("orchestrator temporal address is required")
+		}
+		if strings.TrimSpace(c.Orchestrator.Temporal.Namespace) == "" {
+			return fmt.Errorf("orchestrator temporal namespace is required")
+		}
+		if strings.TrimSpace(c.Orchestrator.Temporal.TaskQueue) == "" {
+			return fmt.Errorf("orchestrator temporal task queue is required")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported orchestrator engine %q: expected %q or %q",
+			c.Orchestrator.Engine, OrchestratorEngineSaga, OrchestratorEngineTemporal)
+	}
 }
 
 func defaultConfigPath() (string, error) {
@@ -73,21 +129,8 @@ func defaultConfigPath() (string, error) {
 	}
 
 	serviceName := strings.TrimSpace(os.Getenv("SERVICE_NAME"))
-	if serviceName != "" {
-		configPath := filepath.Join(cwd, "config", serviceName+".yaml")
-		if _, err := os.Stat(configPath); err == nil {
-			return configPath, nil
-		} else if !os.IsNotExist(err) {
-			return "", err
-		}
+	if serviceName == "" {
+		serviceName = "app"
 	}
-
-	configPath := filepath.Join(cwd, "config.yaml")
-	if _, err := os.Stat(configPath); err == nil {
-		return configPath, nil
-	} else if !os.IsNotExist(err) {
-		return "", err
-	}
-
-	return filepath.Join(cwd, "config.yml"), nil
+	return filepath.Join(cwd, "config", serviceName+".yaml"), nil
 }

@@ -1,0 +1,214 @@
+node:
+  id: api-gateway
+  cluster: master-go-cqrs-api-gateway
+  metadata:
+    gateway_profile: __ENVOY_GATEWAY_PROFILE__
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+overload_manager:
+  refresh_interval: 0.25s
+  resource_monitors:
+    - name: envoy.resource_monitors.global_downstream_max_connections
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+        max_active_downstream_connections: 5000
+  actions:
+    - name: envoy.overload_actions.stop_accepting_requests
+      triggers:
+        - name: envoy.resource_monitors.global_downstream_max_connections
+          threshold:
+            value: 0.95
+
+static_resources:
+  listeners:
+    - name: public_http
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8888
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: api_gateway
+                codec_type: AUTO
+                use_remote_address: true
+                route_config:
+                  name: public_routes
+                  virtual_hosts:
+                    - name: api_gateway
+                      domains:
+                        - "*"
+                      routes:
+__ROUTES__
+                http_filters:
+                  - name: envoy.filters.http.jwt_authn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                      providers:
+                        keycloak:
+                          issuer: __KEYCLOAK_ISSUER__
+                          from_headers:
+                            - name: Authorization
+                              value_prefix: "Bearer "
+                          local_jwks:
+                            inline_string: |
+                              {
+                                "keys": [
+                                  {
+                                    "kty": "RSA",
+                                    "alg": "RS256",
+                                    "use": "sig",
+                                    "kid": "backend-realm-key",
+                                    "n": "7ruRllo31rW1z0FNSK4wHK-NeavcyT4-Hh4QSEyyoQTOth59_EuayTrSf8Dn8JJaWVq8aSYDQTJS3PyhwTC2so4eVNxvbYr_NeWXUN04sc1dk6MlA_391aHEIgi2pRb_bIbPFUUB710xE_fkSCkh3Hm_idIOIvN7Yq9V3b37bku0LVXx1VRAllnM3547fYhlFkHlBrysLWSXL7JmydJ1ZeQNhuTpyAYCvmowdukd2KMdk1Q2gOKxCmBUnmptFZz1G1UHYzhFI-pZluZgfecsG_6_MaO3-RCxJQ2A7LSQTijrKdyIuoKKjHOymR2w-r2y4NI02HN4B0RUHcJJRZeXtQ",
+                                    "e": "AQAB"
+                                  }
+                                ]
+                              }
+                          forward: false
+                          forward_payload_header: x-gateway-jwt-payload
+                          payload_in_metadata: verified_jwt
+                      rules:
+__JWT_BYPASS_RULES__
+                  - name: envoy.filters.http.ext_authz
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+                      failure_mode_allow: false
+                      http_service:
+                        server_uri:
+                          uri: __EXT_AUTHZ_URI__
+                          cluster: api_http
+                          timeout: 0.5s
+                        path_prefix: /internal/ext-authz/check
+                      allowed_headers:
+                        patterns:
+                          - exact: x-gateway-jwt-payload
+                          - exact: x-request-id
+                          - exact: traceparent
+                          - exact: tracestate
+                  - name: envoy.filters.http.grpc_json_transcoder
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+                      proto_descriptor: /etc/envoy/proto.pb
+                      services:
+                        - payment.v1.PaymentService
+                        - affiliate.v1.AffiliateService
+                        - settlement.v1.SettlementService
+                        - agent.v1.AgentConfigService
+                      match_incoming_request_route: true
+                      convert_grpc_status: true
+                      print_options:
+                        add_whitespace: true
+                        always_print_primitive_fields: true
+                        always_print_enums_as_ints: false
+                        preserve_proto_field_names: true
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: api_http
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: api_http
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __API_HTTP_ADDRESS__
+                      port_value: __API_HTTP_PORT__
+    - name: swagger_ui
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: swagger_ui
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __SWAGGER_UI_ADDRESS__
+                      port_value: __SWAGGER_UI_PORT__
+    - name: keycloak
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: keycloak
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __KEYCLOAK_CLUSTER_ADDRESS__
+                      port_value: __KEYCLOAK_CLUSTER_PORT__
+    - name: payment_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: &http2_options
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: payment_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __PAYMENT_GRPC_ADDRESS__
+                      port_value: __PAYMENT_GRPC_PORT__
+    - name: affiliate_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: *http2_options
+      load_assignment:
+        cluster_name: affiliate_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __AFFILIATE_GRPC_ADDRESS__
+                      port_value: __AFFILIATE_GRPC_PORT__
+    - name: settlement_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: *http2_options
+      load_assignment:
+        cluster_name: settlement_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __SETTLEMENT_GRPC_ADDRESS__
+                      port_value: __SETTLEMENT_GRPC_PORT__
+    - name: agent_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options: *http2_options
+      load_assignment:
+        cluster_name: agent_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __AGENT_GRPC_ADDRESS__
+                      port_value: __AGENT_GRPC_PORT__

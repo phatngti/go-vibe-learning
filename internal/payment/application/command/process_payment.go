@@ -4,28 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github/master_go_cqrs/internal/payment/application/dto"
 	"github/master_go_cqrs/internal/payment/domain"
-	"github/master_go_cqrs/internal/platform/outbox"
+	"github/master_go_cqrs/internal/platform/eventstore"
 	platformpostgres "github/master_go_cqrs/internal/platform/postgres"
 
 	"gorm.io/gorm"
 )
 
+// ProcessPaymentHandler charges a payment gateway, transitions the transaction
+// state, and atomically appends the resulting domain event to the event store.
+// The event store relay automatically forwards matching events to the outbox.
 type ProcessPaymentHandler struct {
 	db         *gorm.DB
 	repo       domain.TransactionRepository
 	gateway    domain.PaymentGateway
-	outboxRepo outbox.Repository
+	eventStore eventstore.Repository
 }
 
-func NewProcessPaymentHandler(db *platformpostgres.DB, repo domain.TransactionRepository, gateway domain.PaymentGateway, outboxRepo outbox.Repository) *ProcessPaymentHandler {
+func NewProcessPaymentHandler(
+	db *platformpostgres.DB,
+	repo domain.TransactionRepository,
+	gateway domain.PaymentGateway,
+	eventStore eventstore.Repository,
+) *ProcessPaymentHandler {
 	return &ProcessPaymentHandler{
 		db:         db.DB,
 		repo:       repo,
 		gateway:    gateway,
-		outboxRepo: outboxRepo,
+		eventStore: eventStore,
 	}
 }
 
@@ -47,15 +56,16 @@ func (h *ProcessPaymentHandler) Handle(ctx context.Context, cmd *dto.ProcessPaym
 		CVV:           cmd.CVV,
 	}
 
-	chargeRes, err := h.gateway.Charge(ctx, chargeReq)
+	chargeRes, chargeErr := h.gateway.Charge(ctx, chargeReq)
 	var finalState domain.TransactionState
-	if err != nil || !chargeRes.Success {
+	if chargeErr != nil || !chargeRes.Success {
 		finalState = domain.StateFailed
 	} else {
 		finalState = domain.StateCompleted
 	}
 
 	var updatedTx *domain.Transaction
+
 	err = h.db.Transaction(func(dbTx *gorm.DB) error {
 		if err := h.repo.UpdateStatus(ctx, dbTx, txRecord.ID, finalState); err != nil {
 			return err
@@ -67,18 +77,50 @@ func (h *ProcessPaymentHandler) Handle(ctx context.Context, cmd *dto.ProcessPaym
 			return err
 		}
 
-		if finalState == domain.StateCompleted {
-			payloadBytes, err := json.Marshal(updatedTx)
-			if err != nil {
-				return err
-			}
+		now := time.Now()
+		var (
+			evtType  string
+			evtBytes []byte
+		)
 
-			if err := h.outboxRepo.SaveEvent(ctx, dbTx, "Transaction", updatedTx.ID, "PaymentCompletedEvent", string(payloadBytes)); err != nil {
-				return err
+		if finalState == domain.StateCompleted {
+			evt := domain.PaymentCompleted{
+				TransactionID: updatedTx.ID,
+				AgentID:       updatedTx.AgentID,
+				CustomerID:    updatedTx.CustomerID,
+				Amount:        updatedTx.Amount,
+				Currency:      updatedTx.Currency,
+				OccurredAt:    now,
+			}
+			evtType = evt.EventType()
+			evtBytes, err = json.Marshal(evt)
+			if err != nil {
+				return fmt.Errorf("process_payment: marshal PaymentCompleted: %w", err)
+			}
+		} else {
+			reason := "charge declined"
+			if chargeErr != nil {
+				reason = chargeErr.Error()
+			}
+			evt := domain.PaymentFailed{
+				TransactionID: updatedTx.ID,
+				AgentID:       updatedTx.AgentID,
+				Amount:        updatedTx.Amount,
+				Currency:      updatedTx.Currency,
+				Reason:        reason,
+				OccurredAt:    now,
+			}
+			evtType = evt.EventType()
+			evtBytes, err = json.Marshal(evt)
+			if err != nil {
+				return fmt.Errorf("process_payment: marshal PaymentFailed: %w", err)
 			}
 		}
 
-		return nil
+		// Append domain event to the event store (regardless of success/failure).
+		// The relay automatically enqueues PaymentCompleted to the outbox;
+		// PaymentFailed has no relay mapping and stays in the event store only.
+		return h.appendEvent(ctx, dbTx, updatedTx.ID, evtType, evtBytes)
 	})
 
 	if err != nil {
@@ -86,4 +128,18 @@ func (h *ProcessPaymentHandler) Handle(ctx context.Context, cmd *dto.ProcessPaym
 	}
 
 	return updatedTx, nil
+}
+
+func (h *ProcessPaymentHandler) appendEvent(ctx context.Context, tx *gorm.DB, aggregateID, eventType string, payload []byte) error {
+	version, err := h.eventStore.NextVersion(ctx, tx, "Transaction", aggregateID)
+	if err != nil {
+		return err
+	}
+	return h.eventStore.AppendEvent(ctx, tx, &eventstore.DomainEvent{
+		AggregateType: "Transaction",
+		AggregateID:   aggregateID,
+		EventType:     eventType,
+		Payload:       string(payload),
+		Version:       version,
+	})
 }

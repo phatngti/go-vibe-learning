@@ -10,6 +10,7 @@ import (
 	"github/master_go_cqrs/internal/settlement/domain"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type settlementRepository struct {
@@ -21,8 +22,20 @@ func NewSettlementRepository(db *platformpostgres.DB) domain.SettlementRepositor
 }
 
 func (r *settlementRepository) GetBalance(ctx context.Context, agentID string) (*domain.AgentBalance, error) {
+	return r.getBalance(ctx, r.db, agentID, false)
+}
+
+func (r *settlementRepository) GetBalanceForUpdate(ctx context.Context, db *gorm.DB, agentID string) (*domain.AgentBalance, error) {
+	return r.getBalance(ctx, db, agentID, true)
+}
+
+func (r *settlementRepository) getBalance(ctx context.Context, db *gorm.DB, agentID string, lock bool) (*domain.AgentBalance, error) {
 	var bal domain.AgentBalance
-	err := r.db.WithContext(ctx).First(&bal, "agent_id = ?", agentID).Error
+	query := db.WithContext(ctx)
+	if lock {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := query.First(&bal, "agent_id = ?", agentID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return &domain.AgentBalance{AgentID: agentID, ActiveBalance: 0, CreditLimit: 1000}, nil

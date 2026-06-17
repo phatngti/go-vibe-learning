@@ -16,6 +16,9 @@
     },
     {
       "name": "SettlementService"
+    },
+    {
+      "name": "UserService"
     }
   ],
   "consumes": [
@@ -372,6 +375,110 @@
           "SettlementService"
         ]
       }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "UserService_ListUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/provider/{identity_provider}/{identity_provider_user_id}": {
+      "get": {
+        "operationId": "UserService_GetUserByProviderID",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "identity_provider",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "identity_provider_user_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}": {
+      "get": {
+        "operationId": "UserService_GetUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
     }
   },
   "definitions": {
@@ -417,24 +524,6 @@
         }
       }
     },
-    "v1AccumulateVolumeResponse": {
-      "type": "object",
-      "properties": {
-        "agent_id": {
-          "type": "string"
-        },
-        "total_volume": {
-          "type": "number",
-          "format": "double"
-        },
-        "current_rank": {
-          "type": "string"
-        },
-        "rank_promoted": {
-          "type": "boolean"
-        }
-      }
-    },
     "v1AdjustCreditLimitRequest": {
       "type": "object",
       "properties": {
@@ -459,25 +548,6 @@
         },
         "success": {
           "type": "boolean"
-        }
-      }
-    },
-    "v1CalculateAndCreditCommissionResponse": {
-      "type": "object",
-      "properties": {
-        "agent_id": {
-          "type": "string"
-        },
-        "commission_amount": {
-          "type": "number",
-          "format": "double"
-        },
-        "new_balance": {
-          "type": "number",
-          "format": "double"
-        },
-        "status": {
-          "type": "string"
         }
       }
     },
@@ -614,6 +684,35 @@
         }
       }
     },
+    "v1GetUserResponse": {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "first_name": {
+          "type": "string"
+        },
+        "last_name": {
+          "type": "string"
+        },
+        "email_verified": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "identity_provider": {
+          "type": "string"
+        }
+      }
+    },
     "v1InitiatePaymentRequest": {
       "type": "object",
       "properties": {
@@ -646,6 +745,22 @@
         },
         "status": {
           "type": "string"
+        }
+      }
+    },
+    "v1ListUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1GetUserResponse"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },

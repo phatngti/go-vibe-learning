@@ -19,6 +19,10 @@ func (r *settlementRepoStub) GetBalance(ctx context.Context, agentID string) (*d
 	return r.balance, nil
 }
 
+func (r *settlementRepoStub) GetBalanceForUpdate(context.Context, *gorm.DB, string) (*domain.AgentBalance, error) {
+	return r.balance, nil
+}
+
 func (r *settlementRepoStub) SaveBalance(ctx context.Context, db *gorm.DB, bal *domain.AgentBalance) error {
 	return nil
 }

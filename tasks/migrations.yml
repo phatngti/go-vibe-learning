@@ -1,0 +1,148 @@
+version: '3'
+
+tasks:
+  migrate-create:
+    desc: Create a migration pair for a service. Usage `task migrate-create SERVICE=payment NAME=create_orders`
+    vars:
+      SERVICE: '{{default "payment" .SERVICE}}'
+      MIGRATIONS_DIR: '{{default (printf "migrations/%s" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
+      MIGRATION_NAME: '{{default "" .NAME}}'
+    cmds:
+      - |
+        set -eu
+        dir="{{.MIGRATIONS_DIR}}"
+        name="{{.MIGRATION_NAME}}"
+        if [ -z "$name" ]; then
+          echo "NAME is required. Example: task migrate-create SERVICE=payment NAME=create_orders"
+          exit 1
+        fi
+        slug=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g; s/^_+|_+$//g')
+        if [ -z "$slug" ]; then
+          echo "NAME must contain at least one letter or number"
+          exit 1
+        fi
+        mkdir -p "$dir"
+        last=$(find "$dir" -maxdepth 1 -name '[0-9][0-9][0-9][0-9][0-9][0-9]_*.up.sql' -print | sed -E 's|.*/([0-9]{6})_.*|\1|' | sort -n | tail -1)
+        if [ -z "$last" ]; then
+          next=1
+        else
+          next=$(expr "$last" + 1)
+        fi
+        version=$(printf '%06d' "$next")
+        up="$dir/${version}_${slug}.up.sql"
+        down="$dir/${version}_${slug}.down.sql"
+        if [ -e "$up" ] || [ -e "$down" ]; then
+          echo "Migration already exists for version $version"
+          exit 1
+        fi
+        touch "$up" "$down"
+        echo "Created $up"
+        echo "Created $down"
+
+  migrate-up:
+    desc: Apply the next pending migration for one service
+    vars:
+      SERVICE: '{{default "payment" .SERVICE}}'
+      MIGRATIONS_DIR: '{{default (printf "migrations/%s" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
+      DB_NAME: '{{default (printf "master_go_cqrs_%s" (default "payment" .SERVICE)) .DB_NAME}}'
+    cmds:
+      - |
+        set -eu
+        dir="{{.MIGRATIONS_DIR}}"
+        if [ ! -d "$dir" ]; then
+          echo "Migration folder does not exist: $dir"
+          exit 1
+        fi
+        export PGPASSWORD="{{.DB_PASSWORD}}"
+        psql -v ON_ERROR_STOP=1 -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -c "CREATE TABLE IF NOT EXISTS public.schema_migrations (version TEXT PRIMARY KEY, name TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());"
+        next_file=""
+        for file in $(find "$dir" -maxdepth 1 -name '*.up.sql' -type f | sort); do
+          version=$(basename "$file" | cut -d '_' -f 1)
+          applied=$(psql -At -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -c "SELECT 1 FROM public.schema_migrations WHERE version = '$version' LIMIT 1;")
+          if [ "$applied" != "1" ]; then
+            next_file="$file"
+            break
+          fi
+        done
+        if [ -z "$next_file" ]; then
+          echo "No pending migrations for {{.SERVICE}}"
+          exit 0
+        fi
+        version=$(basename "$next_file" | cut -d '_' -f 1)
+        name=$(basename "$next_file" .up.sql)
+        echo "Applying $next_file to {{.DB_NAME}}"
+        psql -v ON_ERROR_STOP=1 -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -f "$next_file"
+        psql -v ON_ERROR_STOP=1 -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -c "INSERT INTO public.schema_migrations (version, name) VALUES ('$version', '$name');"
+
+  migrate-up-all:
+    desc: Apply all pending migrations for one service
+    cmds:
+      - |
+        set -eu
+        while true; do
+          if ! output=$(task migrate-up SERVICE={{.SERVICE}} MIGRATIONS_DIR={{.MIGRATIONS_DIR}} DB_HOST={{.DB_HOST}} DB_PORT={{.DB_PORT}} DB_USER={{.DB_USER}} DB_PASSWORD={{.DB_PASSWORD}} DB_NAME={{.DB_NAME}}); then
+            echo "$output"
+            exit 1
+          fi
+          echo "$output"
+          if echo "$output" | grep -q "No pending migrations"; then
+            break
+          fi
+        done
+
+  migrate-down:
+    desc: Revert the latest applied migration for one service
+    vars:
+      SERVICE: '{{default "payment" .SERVICE}}'
+      MIGRATIONS_DIR: '{{default (printf "migrations/%s" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
+      DB_NAME: '{{default (printf "master_go_cqrs_%s" (default "payment" .SERVICE)) .DB_NAME}}'
+    cmds:
+      - |
+        set -eu
+        dir="{{.MIGRATIONS_DIR}}"
+        export PGPASSWORD="{{.DB_PASSWORD}}"
+        psql -v ON_ERROR_STOP=1 -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -c "CREATE TABLE IF NOT EXISTS public.schema_migrations (version TEXT PRIMARY KEY, name TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());"
+        version=$(psql -At -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -c "SELECT version FROM public.schema_migrations ORDER BY version DESC LIMIT 1;")
+        if [ -z "$version" ]; then
+          echo "No applied migrations for {{.SERVICE}}"
+          exit 0
+        fi
+        down_file=$(find "$dir" -maxdepth 1 -name "${version}_*.down.sql" -type f | sort | head -1)
+        if [ -z "$down_file" ]; then
+          echo "Missing down migration for version $version in $dir"
+          exit 1
+        fi
+        echo "Reverting $down_file from {{.DB_NAME}}"
+        psql -v ON_ERROR_STOP=1 -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -f "$down_file"
+        psql -v ON_ERROR_STOP=1 -h "{{.DB_HOST}}" -p "{{.DB_PORT}}" -U "{{.DB_USER}}" -d "{{.DB_NAME}}" -c "DELETE FROM public.schema_migrations WHERE version = '$version';"
+
+  migrate-down-all:
+    desc: Revert all applied migrations for one service
+    cmds:
+      - |
+        set -eu
+        while true; do
+          if ! output=$(task migrate-down SERVICE={{.SERVICE}} MIGRATIONS_DIR={{.MIGRATIONS_DIR}} DB_HOST={{.DB_HOST}} DB_PORT={{.DB_PORT}} DB_USER={{.DB_USER}} DB_PASSWORD={{.DB_PASSWORD}} DB_NAME={{.DB_NAME}}); then
+            echo "$output"
+            exit 1
+          fi
+          echo "$output"
+          if echo "$output" | grep -q "No applied migrations"; then
+            break
+          fi
+        done
+
+  migrate-up-all-services:
+    desc: Apply all pending migrations for every service database in k3d
+    cmds:
+      - task: k3d-migrate
+
+  migrate-down-all-services:
+    desc: Revert all applied migrations from every service database
+    cmds:
+      - task migrate-down-all SERVICE=agent
+      - task migrate-down-all SERVICE=settlement
+      - task migrate-down-all SERVICE=affiliate
+      - task migrate-down-all SERVICE=payment
+      - task migrate-down-all SERVICE=orchestrator
+      - task migrate-down-all SERVICE=user

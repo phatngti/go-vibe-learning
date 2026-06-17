@@ -1,3 +1,6 @@
+// File: internal/platform/outbox/repository.go
+// Description: GORM repository implementation to enqueue, claim, and update outbox events.
+
 package outbox
 
 import (
@@ -7,84 +10,105 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository interface {
-	SaveEvent(ctx context.Context, db *gorm.DB, aggregateType, aggregateID, eventType, payload string) error
-	GetPendingEvents(ctx context.Context, limit int) ([]*OutboxEvent, error)
-	MarkAsProcessed(ctx context.Context, id uuid.UUID) error
-	MarkAsFailed(ctx context.Context, id uuid.UUID, errMsg string) error
+	Enqueue(ctx context.Context, db *gorm.DB, params EnqueueParams) error
+	Claim(ctx context.Context, workerID string, limit int, staleAfter time.Duration) ([]*Event, error)
+	MarkProcessed(ctx context.Context, id uuid.UUID) error
+	MarkRetry(ctx context.Context, id uuid.UUID, errMsg string, delay time.Duration) error
 }
 
-type gormRepository struct {
+type repository struct {
 	db *gorm.DB
 }
 
 func NewRepository(db *gorm.DB) Repository {
-	return &gormRepository{db: db}
+	return &repository{db: db}
 }
 
-func (r *gormRepository) SaveEvent(ctx context.Context, db *gorm.DB, aggregateType, aggregateID, eventType, payload string) error {
-	// If a transaction DB is passed, use it; otherwise use default DB
+func (r *repository) Enqueue(ctx context.Context, db *gorm.DB, params EnqueueParams) error {
 	activeDB := r.db
 	if db != nil {
 		activeDB = db
 	}
-
-	event := &OutboxEvent{
+	now := time.Now()
+	event := &Event{
 		ID:            uuid.New(),
-		AggregateType: aggregateType,
-		AggregateID:   aggregateID,
-		EventType:     eventType,
-		Payload:       payload,
+		MessageID:     params.MessageID,
+		Topic:         params.Topic,
+		MessageKey:    params.MessageKey,
+		MessageType:   params.MessageType,
+		AggregateType: params.AggregateType,
+		AggregateID:   params.AggregateID,
+		Payload:       string(params.Payload),
 		Status:        "PENDING",
-		CreatedAt:     time.Now(),
+		AvailableAt:   now,
+		CreatedAt:     now,
 	}
-
-	if err := activeDB.WithContext(ctx).Create(event).Error; err != nil {
-		return fmt.Errorf("failed to save outbox event: %w", err)
+	err := activeDB.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "message_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"topic": params.Topic, "message_key": params.MessageKey,
+			"message_type": params.MessageType, "aggregate_type": params.AggregateType,
+			"aggregate_id": params.AggregateID, "payload": string(params.Payload),
+			"status": "PENDING", "available_at": now, "locked_at": nil,
+			"locked_by": "", "error_log": "", "processed_at": nil,
+		}),
+	}).Create(event).Error
+	if err != nil {
+		return fmt.Errorf("outbox: enqueue message %s: %w", params.MessageID, err)
 	}
 	return nil
 }
 
-func (r *gormRepository) GetPendingEvents(ctx context.Context, limit int) ([]*OutboxEvent, error) {
-	var events []*OutboxEvent
-	err := r.db.WithContext(ctx).
-		Where("status = ?", "PENDING").
-		Order("created_at asc").
-		Limit(limit).
-		Find(&events).Error
+func (r *repository) Claim(ctx context.Context, workerID string, limit int, staleAfter time.Duration) ([]*Event, error) {
+	var events []*Event
+	staleBefore := time.Now().Add(-staleAfter)
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return tx.Raw(`
+			WITH picked AS (
+				SELECT id
+				FROM public.outbox_events
+				WHERE (status = 'PENDING' AND available_at <= NOW())
+				   OR (status = 'PROCESSING' AND locked_at < ?)
+				ORDER BY created_at
+				FOR UPDATE SKIP LOCKED
+				LIMIT ?
+			)
+			UPDATE public.outbox_events AS events
+			SET status = 'PROCESSING', locked_at = NOW(), locked_by = ?
+			FROM picked
+			WHERE events.id = picked.id
+			RETURNING events.*`, staleBefore, limit, workerID).Scan(&events).Error
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to query pending outbox events: %w", err)
+		return nil, fmt.Errorf("outbox: claim pending events: %w", err)
 	}
 	return events, nil
 }
 
-func (r *gormRepository) MarkAsProcessed(ctx context.Context, id uuid.UUID) error {
+func (r *repository) MarkProcessed(ctx context.Context, id uuid.UUID) error {
 	now := time.Now()
-	err := r.db.WithContext(ctx).
-		Model(&OutboxEvent{}).
-		Where("id = ?", id).
-		Updates(map[string]interface{}{
-			"status":       "PROCESSED",
-			"processed_at": &now,
-		}).Error
+	err := r.db.WithContext(ctx).Model(&Event{}).Where("id = ?", id).Updates(map[string]any{
+		"status": "PROCESSED", "processed_at": &now, "locked_at": nil,
+		"locked_by": "", "error_log": "",
+	}).Error
 	if err != nil {
-		return fmt.Errorf("failed to mark outbox event %s as processed: %w", id, err)
+		return fmt.Errorf("outbox: mark event %s processed: %w", id, err)
 	}
 	return nil
 }
 
-func (r *gormRepository) MarkAsFailed(ctx context.Context, id uuid.UUID, errMsg string) error {
-	err := r.db.WithContext(ctx).
-		Model(&OutboxEvent{}).
-		Where("id = ?", id).
-		Updates(map[string]interface{}{
-			"status":    "FAILED",
-			"error_log": errMsg,
-		}).Error
+func (r *repository) MarkRetry(ctx context.Context, id uuid.UUID, errMsg string, delay time.Duration) error {
+	err := r.db.WithContext(ctx).Model(&Event{}).Where("id = ?", id).Updates(map[string]any{
+		"status": "PENDING", "attempts": gorm.Expr("attempts + 1"),
+		"available_at": time.Now().Add(delay), "locked_at": nil,
+		"locked_by": "", "error_log": errMsg,
+	}).Error
 	if err != nil {
-		return fmt.Errorf("failed to mark outbox event %s as failed: %w", id, err)
+		return fmt.Errorf("outbox: reschedule event %s: %w", id, err)
 	}
 	return nil
 }

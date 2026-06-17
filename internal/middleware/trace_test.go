@@ -20,30 +20,15 @@ func TestTracerTraceAppliesOptionsAndRecordsError(t *testing.T) {
 
 	ctx := context.Background()
 	traceErr := errors.New("auth failed")
-	hookCalled := false
 
 	endTrace := NewTracer(tracer).Trace(&ctx, "Login",
 		TraceAttributes(attribute.String("username", "alice")),
-		TraceHooks(func(ctx context.Context, span trace.Span) {
-			hookCalled = true
-			if !span.SpanContext().IsValid() {
-				t.Fatal("expected hook to receive a valid span")
-			}
-			if !trace.SpanFromContext(ctx).SpanContext().IsValid() {
-				t.Fatal("expected hook to receive the span context")
-			}
-			span.SetAttributes(attribute.String("hook", "called"))
-		}),
 		TraceError(&traceErr),
 	)
 
 	if !trace.SpanFromContext(ctx).SpanContext().IsValid() {
 		t.Fatal("expected Trace to update the caller context")
 	}
-	if !hookCalled {
-		t.Fatal("expected trace hook to run")
-	}
-
 	endTrace()
 
 	spans := exporter.GetSpans()
@@ -59,7 +44,6 @@ func TestTracerTraceAppliesOptionsAndRecordsError(t *testing.T) {
 
 	attrs := attributesByKey(spans[0].Attributes)
 	assertAttr(t, attrs, "username", "alice")
-	assertAttr(t, attrs, "hook", "called")
 }
 
 func testTracer(t *testing.T) (*tracetest.InMemoryExporter, trace.Tracer, func()) {

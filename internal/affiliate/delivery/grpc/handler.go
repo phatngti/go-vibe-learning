@@ -16,15 +16,13 @@ import (
 type ServerHandler struct {
 	affiliatev1.UnimplementedAffiliateServiceServer
 	registerReferral *command.RegisterReferralHandler
-	accumulateVolume *command.AccumulateVolumeHandler
 	getRank          *query.GetRankHandler
 	getDownline      *query.GetDownlineHandler
 }
 
-func NewServerHandler(grpcServer *grpc.Server, registerReferral *command.RegisterReferralHandler, accumulateVolume *command.AccumulateVolumeHandler, getRank *query.GetRankHandler, getDownline *query.GetDownlineHandler) *ServerHandler {
+func NewServerHandler(grpcServer *grpc.Server, registerReferral *command.RegisterReferralHandler, getRank *query.GetRankHandler, getDownline *query.GetDownlineHandler) *ServerHandler {
 	h := &ServerHandler{
 		registerReferral: registerReferral,
-		accumulateVolume: accumulateVolume,
 		getRank:          getRank,
 		getDownline:      getDownline,
 	}
@@ -43,20 +41,6 @@ func (h *ServerHandler) RegisterReferral(ctx context.Context, req *affiliatev1.R
 	return &affiliatev1.RegisterReferralResponse{
 		Success: true,
 		Message: "Referral relationship linked successfully",
-	}, nil
-}
-
-func (h *ServerHandler) AccumulateVolume(ctx context.Context, req *affiliatev1.AccumulateVolumeRequest) (*affiliatev1.AccumulateVolumeResponse, error) {
-	metrics, rank, promoted, err := h.accumulateVolume.Handle(ctx, &dto.AccumulateVolume{AgentID: req.AgentId, Amount: req.Amount})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to accumulate volume: %v", err)
-	}
-
-	return &affiliatev1.AccumulateVolumeResponse{
-		AgentId:      metrics.AgentID,
-		TotalVolume:  metrics.AccumulatedVolume,
-		CurrentRank:  string(rank),
-		RankPromoted: promoted,
 	}, nil
 }
 

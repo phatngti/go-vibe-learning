@@ -9,7 +9,7 @@ import (
 
 	accesscontrolquery "github/master_go_cqrs/internal/accesscontrol/application/query"
 	accesscontrolhttp "github/master_go_cqrs/internal/accesscontrol/delivery/http"
-	apphttp "github/master_go_cqrs/internal/app/delivery/http"
+	userhttp "github/master_go_cqrs/internal/user/delivery/http"
 	"github/master_go_cqrs/internal/config"
 	"github/master_go_cqrs/internal/httpapi/route"
 	"github/master_go_cqrs/internal/observability/logger"
@@ -39,7 +39,7 @@ func passthrough(next echo.HandlerFunc) echo.HandlerFunc {
 func TestServerRoutes(t *testing.T) {
 	lifecycle := fxtest.NewLifecycle(t)
 	registrars := []route.Registrar{
-		apphttp.NewHandler(apphttp.HandlerParams{TokenAuth: allowAll{}}),
+		userhttp.NewHandler(userhttp.HandlerParams{TokenAuth: allowAll{}}),
 		accesscontrolhttp.NewHandler(accesscontrolhttp.HandlerParams{
 			CheckAuthn: accesscontrolquery.NewCheckAuthnHandler(),
 			CheckRBAC:  accesscontrolquery.NewCheckRBACHandler(),

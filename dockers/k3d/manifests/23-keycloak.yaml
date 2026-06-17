@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - start-dev
+            - --import-realm
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-admin-user
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-admin-password
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: postgres
+            - name: KC_DB_URL_PORT
+              value: "5432"
+            - name: KC_DB_URL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-db-name
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-db-user
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-db-password
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HOSTNAME
+              value: http://keycloak.master-go-cqrs.svc.cluster.local:8080
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_HOSTNAME_STRICT_HTTPS
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /realms/backend/.well-known/openid-configuration
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: keycloak-realm
+              mountPath: /opt/keycloak/data/import/backend-realm.json
+              subPath: backend-realm.json
+              readOnly: true
+      volumes:
+        - name: keycloak-realm
+          configMap:
+            name: keycloak-realm

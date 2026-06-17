@@ -8,8 +8,9 @@ type RegisterReferral struct {
 }
 
 type AccumulateVolume struct {
-	AgentID string  `json:"agent_id" example:"agent-123"`
-	Amount  float64 `json:"amount" example:"1000"`
+	TransactionID string  `json:"transaction_id,omitempty"`
+	AgentID       string  `json:"agent_id" example:"agent-123"`
+	Amount        float64 `json:"amount" example:"1000"`
 }
 
 type RegisterReferralResponse struct {

@@ -51,14 +51,6 @@ func DecodeUserPayload(payload string) (User, error) {
 	return user, nil
 }
 
-func EncodeUserPayloadForTest(claim any) (string, error) {
-	raw, err := json.Marshal(claim)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(raw), nil
-}
-
 func (c userClaim) toUser() User {
 	resources := make([]ResourceAccess, 0, len(c.Authorization.Permissions))
 	for _, p := range c.Authorization.Permissions {

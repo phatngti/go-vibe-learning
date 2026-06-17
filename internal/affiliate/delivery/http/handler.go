@@ -12,8 +12,6 @@ import (
 	"github/master_go_cqrs/internal/security/gatewayauth"
 
 	"github.com/labstack/echo/v4"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -23,7 +21,6 @@ type Handler struct {
 	registerReferral *command.RegisterReferralHandler
 	getRank          *query.GetRankHandler
 	getDownline      *query.GetDownlineHandler
-	tracer           trace.Tracer
 	authenticate     gatewayauth.Middleware
 }
 
@@ -42,7 +39,6 @@ func NewHandler(params HandlerParams) route.Registrar {
 		registerReferral: params.RegisterReferral,
 		getRank:          params.GetRank,
 		getDownline:      params.GetDownline,
-		tracer:           otel.Tracer("affiliate.delivery.http"),
 		authenticate:     params.TokenAuth,
 	}
 }

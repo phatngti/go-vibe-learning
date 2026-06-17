@@ -5,6 +5,34 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "backend-realm-key",
+        "providerId": "rsa",
+        "config": {
+          "privateKey": [
+            "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDuu5GWWjfWtbXPQU1IrjAcr415q9zJPj4eHhBITLKhBM62Hn38S5rJOtJ/wOfwklpZWrxpJgNBMlLc/KHBMLayjh5U3G9tiv815ZdQ3TixzV2ToyUD/f3VocQiCLalFv9shs8VRQHvXTET9+RIKSHceb+J0g4i83tir1XdvftuS7QtVfHVVECWWczfnjt9iGUWQeUGvKwtZJcvsmbJ0nVl5A2G5OnIBgK+ajB26R3Yox2TVDaA4rEKYFSeam0VnPUbVQdjOEUj6lmW5mB95ywb/r8xo7f5ELElDYDstJBOKOsp3Ii6goqMc7KZHbD6vbLg0jTYc3gHRFQdwklFl5e1AgMBAAECggEAE5ScUAvlxQ1B1HYrb9DjntKyRJ65PONHRoKaPMfXpdfGWY8eL7WGxEb4EWTh0Sw7z1TfG7OztCL7w2bQII+NiI8aA0VSOVabcJD8bHQ8jG7G5E9O/6kTKvS56L20t00v1XeoH/s5Oaf32Mat+VIwVgxBTr1FDg5Q2ir93LJSnzzbRC6icLJyLXA3o/7EN0ODfnkHFe/7r75D1zHq8tNgCSMdtki7+BhAMwCjB0gCQykJhc0/0q2KIEL0GhPbbafY4brLyJLTrjRZPkFkdolxw0ac98xUq+88lBfRb21gGxR/3NuEBf/UAXY+r4ptX7+j9p505YEuLtPcdr4qDJdiMQKBgQD5FZv9zERvARAMyG2gNlIEm0b4ziFi3GSDGQwizvAtAVgiPzAxARMmrOkQrQtcoIieIAHwMdJJgYlceWb/vHZ7kdTqpaco0ScEl2JBm/mVE1cju2AYmFfipKIMAO+Q0eHYDvHKOSFTW6i2NrDYMBkvrr/+jTP2iaTnhKeX5g2B8QKBgQD1XGIvaKn0C7z6GbfsxrUVrEib/09CCu7t4faRSepNaqvPx/DQN5W5uuemHuZutiR9k7Gjn3mGD2b+9B2b7PGJeeUBtQxp0hnPlOlTpKyH6gBn2hLIqydAAHRWaryaNifb1Jdtvk/eIO773uzeZyz5S4HPbJ48fhvbNCrcGubuBQKBgH9Uep+tMjaElo3ST6gc3KSaNBewWATPoVobDcclfkWjcEhhgOMsJ3wX3DS4IRzCu9QJjLQa4+LLo0pwjSSiVPcqP2uMLv2Ana+NK59aeqWoc11CxgcMqbCkdGoqeEzR3d+zFAtKVSzlqEMthg2d2OI1NNSNnkijaHcpqvrNkY4hAoGAM+efPbg+e8of6CiYqBZBKJyRn66a7bWyZdBvgLzKPCZcwk/huaqImgnYB2RyCumtPoOICL0r0BhiCX1K5jlxv0tyDrJmNdykaS1vTqp/dSEjhNS1NI5Ad2GhOsbJrzXVqMOIZUblTnBZHh9CrKnW8cXvaBnqP5HOAsk+Z+GpCKECgYEA44+5Lxvklrwv/32Dv/7jsUdNbwAFLTgzD0QuI44m1ynq0HJbIQVdbrdA+U4QKQNaUeltYHdnEoncHsGPDv8RrY6+xA7Z2oSJGsMzvb9ipbSAdRcDs668s2OcHUa8gTxNUsGwyr/4W43YtYV5hiGIyYLTR3oxf9rNrsO8gc8Vlgc="
+          ],
+          "certificate": [
+            "MIIDETCCAfmgAwIBAgIUCAv+0//iEvWRt4yX+OV4uvat4DUwDQYJKoZIhvcNAQELBQAwGDEWMBQGA1UEAwwNYmFja2VuZC1yZWFsbTAeFw0yNjA2MTYxNTQ5MTVaFw0zNjA2MTMxNTQ5MTVaMBgxFjAUBgNVBAMMDWJhY2tlbmQtcmVhbG0wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDuu5GWWjfWtbXPQU1IrjAcr415q9zJPj4eHhBITLKhBM62Hn38S5rJOtJ/wOfwklpZWrxpJgNBMlLc/KHBMLayjh5U3G9tiv815ZdQ3TixzV2ToyUD/f3VocQiCLalFv9shs8VRQHvXTET9+RIKSHceb+J0g4i83tir1XdvftuS7QtVfHVVECWWczfnjt9iGUWQeUGvKwtZJcvsmbJ0nVl5A2G5OnIBgK+ajB26R3Yox2TVDaA4rEKYFSeam0VnPUbVQdjOEUj6lmW5mB95ywb/r8xo7f5ELElDYDstJBOKOsp3Ii6goqMc7KZHbD6vbLg0jTYc3gHRFQdwklFl5e1AgMBAAGjUzBRMB0GA1UdDgQWBBSnhKhrbM+K3+YmfxZYmeLZ1icpqTAfBgNVHSMEGDAWgBSnhKhrbM+K3+YmfxZYmeLZ1icpqTAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBIDSGCZ008t2Grc72NTpUO8shJq1PrYbfGnZb+l8r4axClD5E7tMLF+XRS/NTvC4WP4vPFUb+VwClnfzunWhRmcNjWqUdzkJOjvZCP2Mi67oUAlHdZiza6eIjpPiWi4NWDBw0Xfl9eNY4KDxm1LMl41MCRGQ8b91F29YvP3X25DDznvmtnN7P9AQbpZsLBf0BhKsm6If31/9oqEIydmah8aY24e9SbuaSQVD9HsNxatqPjkf9/mf3thWCFgzDZywAgYZVrbdIsC5jA91IHq2nO4NBR/88X6YJjqHovSnrUAkUq1q1l18A0IABGrB2vsKyk4+2nZRmtowvRd9LsKEaT"
+          ],
+          "priority": [
+            "100"
+          ],
+          "active": [
+            "true"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "kid": [
+            "backend-realm-key"
+          ]
+        }
+      }
+    ]
+  },
   "clients": [
     {
       "clientId": "master-go-cqrs",
@@ -12,7 +40,7 @@
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
-      "secret": "master_go_cqrs_secret",
+      "secret": "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,

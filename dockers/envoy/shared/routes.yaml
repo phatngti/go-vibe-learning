@@ -1,0 +1,115 @@
+# routes.yaml — Single source of truth for all API gateway routing.
+# Adding a new route? Just add an entry here and run generate_config.py.
+#
+# Each entry is processed IN ORDER — Envoy evaluates top-to-bottom,
+# so more specific routes must appear before broader prefixes.
+#
+# Fields:
+#   path/prefix  — Exact path or prefix match (mutually exclusive)
+#   method       — HTTP method constraint (optional, e.g. POST, GET)
+#   cluster      — Target Envoy cluster name
+#   timeout      — Per-route timeout (optional, uses defaults.timeout; set null to omit)
+#   public       — If true, bypasses both JWT auth and ext_authz
+#   redirect_to  — If set, this is a redirect (no cluster needed)
+#   direct_response — If set, returns an inline response (status + body, no cluster)
+
+defaults:
+  timeout: 60s
+
+routes:
+  # ── Root redirect ──
+  - path: /
+    redirect_to: /api/v1/swagger/
+    public: true
+
+  # ── Swagger UI ──
+  - prefix: /api/v1/swagger/
+    cluster: swagger_ui
+    timeout: null
+    public: true
+
+  - path: /api/v1/swagger
+    redirect_to: /api/v1/swagger/
+    public: true
+
+  # ── Payment service ──
+  - path: /api/v1/payment/initiate
+    method: POST
+    cluster: payment_grpc
+
+  - prefix: /api/v1/payment/checkout/
+    cluster: payment_grpc
+    public: true
+
+  # ── Affiliate service ──
+  - path: /api/v1/affiliate/referral/link
+    method: POST
+    cluster: affiliate_grpc
+
+  - prefix: /api/v1/affiliate/rank/
+    cluster: affiliate_grpc
+
+  - prefix: /api/v1/affiliate/downline/
+    cluster: affiliate_grpc
+
+  # ── Settlement service ──
+  - prefix: /api/v1/settlement/balance/
+    cluster: settlement_grpc
+
+  - path: /api/v1/settlement/withdraw
+    method: POST
+    cluster: settlement_grpc
+
+  - path: /api/v1/settlement/credit/limit
+    method: POST
+    cluster: settlement_grpc
+
+  # ── Agent service ──
+  - path: /api/v1/agent/config/callback
+    method: POST
+    cluster: agent_grpc
+
+  - path: /api/v1/agent/config/key/generate
+    method: POST
+    cluster: agent_grpc
+
+  # ── Auth routes (HTTP backend) ──
+  - path: /api/v1/auth/login
+    method: POST
+    cluster: api_http
+    public: true
+
+  - path: /api/v1/auth/refresh
+    method: POST
+    cluster: api_http
+    public: true
+
+  - path: /api/v1/auth/verify-token
+    method: GET
+    cluster: api_http
+
+  - path: /api/v1/auth/info
+    method: GET
+    cluster: api_http
+
+  - prefix: /api/v1/auth/
+    cluster: api_http
+
+  - prefix: /api/v1/author/
+    cluster: api_http
+
+  # ── Health & root ──
+  - path: /api/v1/health
+    cluster: api_http
+    public: true
+
+  - path: /api/v1
+    cluster: api_http
+    public: true
+
+  # ── Catch-all (must be last) ──
+  - prefix: /api/v1/
+    direct_response:
+      status: 404
+      body: '{"error":"route not found"}'
+    public: true

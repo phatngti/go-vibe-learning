@@ -16,18 +16,6 @@ message RegisterReferralResponse {
   string message = 2;
 }
 
-message AccumulateVolumeRequest {
-  string agent_id = 1;
-  double amount = 2;
-}
-
-message AccumulateVolumeResponse {
-  string agent_id = 1;
-  double total_volume = 2;
-  string current_rank = 3;
-  bool rank_promoted = 4;
-}
-
 message GetAgentRankRequest {
   string agent_id = 1;
 }
@@ -56,7 +44,6 @@ service AffiliateService {
       body: "*"
     };
   }
-  rpc AccumulateVolume(AccumulateVolumeRequest) returns (AccumulateVolumeResponse);
   rpc GetAgentRank(GetAgentRankRequest) returns (GetAgentRankResponse) {
     option (google.api.http) = {
       get: "/api/v1/affiliate/rank/{agent_id}"

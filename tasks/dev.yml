@@ -1,0 +1,261 @@
+version: '3'
+
+tasks:
+  dev-up:
+    desc: Deploy k3d services and connect the host to the cluster through Telepresence
+    cmds:
+      - task: k3d-deploy
+      - task: dev-connect
+
+  dev-down:
+    desc: Disconnect Telepresence and delete the k3d cluster (reverse of dev-up)
+    cmds:
+      - task: telepresence-disconnect
+      - task: k3d-cluster-delete
+
+  dev-connect:
+    desc: Install the Telepresence traffic manager and connect this host to k3d
+    cmds:
+      - task: telepresence-ready
+      - task: dev-hosts
+
+  dev-disconnect:
+    desc: Disconnect Telepresence without stopping the k3d cluster
+    cmds:
+      - task: telepresence-disconnect
+
+  dev-ui:
+    desc: Show and verify browser UI URLs through Telepresence service DNS
+    cmds:
+      - task: k3d-ui-urls
+      - task: dev-hosts
+
+  dev-hosts:
+    desc: Update /etc/hosts for browser access to k3d service DNS names
+    cmds:
+      - task: k3d-hosts
+
+  dev-ui-forward:
+    desc: Deprecated alias for dev-ui; no kubectl port-forward is started
+    cmds:
+      - task: k3d-ui-urls
+
+  dev-run:
+    desc: Run one service locally with Air hot reload and k3d dependency access
+    vars:
+      SERVICE: '{{default "user" .SERVICE}}'
+    cmds:
+      - |
+        set -eu
+        service="{{.SERVICE}}"
+        case "$service" in
+          user|payment|affiliate|settlement|agent|orchestrator) ;;
+          *)
+            echo "Unsupported service: $service"
+            echo "Expected one of: user payment affiliate settlement agent orchestrator"
+            exit 1
+            ;;
+        esac
+
+        air_dir="{{.DEV_DIR}}/air/$service"
+        config_file="$air_dir/air.toml"
+        mkdir -p "$air_dir/tmp"
+        cat > "$config_file" <<EOF
+        root = "{{.ROOT_DIR}}"
+        tmp_dir = "{{.DEV_DIR}}/air/$service/tmp"
+
+        [build]
+        cmd = "go build -o ./{{.DEV_DIR}}/air/$service/service ./cmd/$service"
+        entrypoint = ["./{{.DEV_DIR}}/air/$service/service"]
+        include_dir = ["cmd/$service", "internal"]
+        include_file = ["go.mod", "go.sum", "config/$service.yaml"]
+        include_ext = ["go", "mod", "sum", "yaml", "yml"]
+        exclude_dir = [".git", "{{.DEV_DIR}}", "bin", "docs", "dockers", "migrations", "proto", "vendor"]
+        exclude_regex = ['_test\\.go']
+        delay = 500
+        stop_on_error = false
+        send_interrupt = true
+        kill_delay = "2s"
+
+        [log]
+        time = true
+
+        [misc]
+        clean_on_exit = true
+
+        [screen]
+        clear_on_rebuild = false
+        keep_scroll = true
+        EOF
+      - task: ensure-air
+      - task: telepresence-ready
+      - |
+        set -eu
+        service="{{.SERVICE}}"
+        config_file="{{.DEV_DIR}}/air/$service/air.toml"
+        echo "Running $service locally with k3d dependencies through Telepresence"
+        SERVICE_NAME="$service" \
+        CONFIG_PATH="{{.ROOT_DIR}}/config/$service.yaml" \
+          "{{.AIR}}" -c "$config_file"
+
+  dev-start:
+    desc: Build, import, and restart k3d app deployments. Use SERVICES=name or SERVICES=all
+    vars:
+      SERVICES: '{{default "all" .SERVICES}}'
+    cmds:
+      - task: k3d-cluster-up
+      - task: k3d-image-import
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        services="{{.SERVICES}}"
+        if [ "$services" = "all" ]; then
+          services="user payment affiliate settlement agent orchestrator"
+        fi
+        for service in $services; do
+          kubectl -n "$ns" rollout restart "deployment/$service"
+          kubectl -n "$ns" rollout status "deployment/$service" --timeout=300s
+        done
+
+  dev-stop:
+    desc: Scale k3d app deployments to zero. Use SERVICES=name or SERVICES=all
+    vars:
+      SERVICES: '{{default "all" .SERVICES}}'
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        services="{{.SERVICES}}"
+        if [ "$services" = "all" ]; then
+          services="user payment affiliate settlement agent orchestrator"
+        fi
+        for service in $services; do
+          kubectl -n "$ns" scale "deployment/$service" --replicas=0
+        done
+
+  dev-restart:
+    desc: Restart k3d app deployments. Use SERVICES=name or SERVICES=all
+    vars:
+      SERVICES: '{{default "all" .SERVICES}}'
+    cmds:
+      - task: dev-start
+        vars:
+          SERVICES: '{{.SERVICES}}'
+
+  dev-status:
+    desc: Show k3d, Istio, and Telepresence status
+    cmds:
+      - task: k3d-status
+      - task: telepresence-status
+
+  dev-logs:
+    desc: Follow k3d app logs. Use SERVICES=name for one service, or SERVICES=all
+    vars:
+      SERVICES: '{{default "all" .SERVICES}}'
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        if [ "{{.SERVICES}}" = "all" ]; then
+          kubectl -n "$ns" logs -f -l app.kubernetes.io/part-of=master-go-cqrs --all-containers --max-log-requests=20 --tail=80
+        else
+          kubectl -n "$ns" logs -f "deployment/{{.SERVICES}}" -c "{{.SERVICES}}" --tail=160
+        fi
+
+  infra-logs:
+    desc: Follow k3d infra logs. Use INFRA_SERVICE=postgres|kafka|jaeger|otel|keycloak or INFRA_SERVICE=all
+    vars:
+      INFRA_SERVICE: '{{default "all" .INFRA_SERVICE}}'
+    cmds:
+      - |
+        set -eu
+        ns="{{.K8S_NAMESPACE}}"
+        if [ "{{.INFRA_SERVICE}}" = "all" ]; then
+          kubectl -n "$ns" logs -f -l app.kubernetes.io/name --all-containers --max-log-requests=20 --tail=120
+        elif [ "{{.INFRA_SERVICE}}" = "postgres" ]; then
+          kubectl -n "$ns" logs -f statefulset/postgres -c postgres --tail=160
+        else
+          kubectl -n "$ns" logs -f "deployment/{{.INFRA_SERVICE}}" -c "{{.INFRA_SERVICE}}" --tail=160
+        fi
+
+  gateway-up:
+    desc: Regenerate gateway artifacts and restart the k3d Envoy gateway
+    cmds:
+      - task: k3d-sync-configmaps
+      - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/40-gateway.yaml"
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout restart deployment/swagger-ui deployment/api-gateway
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout status deployment/swagger-ui --timeout=300s
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout status deployment/api-gateway --timeout=300s
+      - 'echo "Envoy API gateway: http://localhost:8888"'
+      - 'echo "Swagger UI: http://localhost:8888/api/v1/swagger/"'
+
+  gateway-stop:
+    desc: Scale down the k3d Envoy API gateway and Swagger UI
+    cmds:
+      - kubectl -n "{{.K8S_NAMESPACE}}" scale deployment/api-gateway deployment/swagger-ui --replicas=0
+
+  gateway-validate:
+    desc: Validate generated Envoy configuration
+    cmds:
+      - task: gen-proto
+      - task: gen-envoy-config
+      - docker run --rm -v "{{.ROOT_DIR}}/dockers/envoy:/etc/envoy:ro" envoyproxy/envoy:v1.32-latest envoy --mode validate -c /etc/envoy/envoy.yaml
+
+  gateway-smoke:
+    desc: Verify Envoy, Swagger UI, and the generated service OpenAPI document are reachable
+    cmds:
+      - |
+        set -eu
+        gateway_url="${GATEWAY_URL:-http://localhost:8888}"
+        root_status=""
+        for attempt in $(seq 1 30); do
+          root_status=$(curl -sS -o /dev/null -w '%{http_code}' "$gateway_url/" 2>/dev/null || true)
+          if [ "$root_status" = "301" ] || [ "$root_status" = "302" ]; then
+            break
+          fi
+          sleep 1
+        done
+        if [ "$root_status" != "301" ] && [ "$root_status" != "302" ]; then
+          echo "Expected $gateway_url/ to redirect to Swagger UI, got HTTP $root_status"
+          exit 1
+        fi
+        initializer=""
+        for attempt in $(seq 1 30); do
+          if initializer=$(curl -fsS "$gateway_url/api/v1/swagger/swagger-initializer.js" 2>/dev/null); then
+            break
+          fi
+          sleep 1
+        done
+        if [ -z "$initializer" ]; then
+          echo "Swagger UI initializer was not reachable at $gateway_url/api/v1/swagger/swagger-initializer.js"
+          exit 1
+        fi
+        if echo "$initializer" | grep -q 'petstore.swagger.io'; then
+          echo "Swagger UI is still configured for the Petstore example"
+          exit 1
+        fi
+        echo "$initializer" | grep -q './swagger.json'
+        swagger=""
+        for attempt in $(seq 1 30); do
+          if swagger=$(curl -fsS "$gateway_url/api/v1/swagger/swagger.json" 2>/dev/null); then
+            break
+          fi
+          sleep 1
+        done
+        if [ -z "$swagger" ]; then
+          echo "Generated Swagger document was not reachable at $gateway_url/api/v1/swagger/swagger.json"
+          exit 1
+        fi
+        echo "$swagger" | grep -q '"PaymentService"'
+        echo "$swagger" | grep -q '"AffiliateService"'
+        echo "$swagger" | grep -q '"SettlementService"'
+        echo "$swagger" | grep -q '"AgentConfigService"'
+        for attempt in $(seq 1 30); do
+          if curl -fsS "$gateway_url/api/v1/health" >/dev/null 2>&1; then
+            echo "Gateway smoke check passed: $gateway_url"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "API health endpoint was not reachable through Envoy at $gateway_url/api/v1/health"
+        exit 1

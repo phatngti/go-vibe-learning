@@ -1,0 +1,97 @@
+version: '3'
+
+tasks:
+  proto-tools:
+    desc: Install protobuf plugins needed for Go, gRPC, Envoy descriptor, and Swagger generation
+    cmds:
+      - |
+        set -eu
+        protoc_bin="${PROTOC:-}"
+        if [ -z "$protoc_bin" ]; then
+          for candidate in /opt/homebrew/bin/protoc /usr/local/bin/protoc /usr/bin/protoc "$(command -v protoc 2>/dev/null || true)"; do
+            if [ -n "$candidate" ] && [ -x "$candidate" ] && "$candidate" --version >/dev/null 2>&1; then
+              protoc_bin="$candidate"
+              break
+            fi
+          done
+        fi
+        if [ -z "$protoc_bin" ]; then
+          echo "protoc is required. Install protobuf or set PROTOC=/path/to/protoc."
+          exit 1
+        fi
+        "$protoc_bin" --version
+        export PATH="$(go env GOPATH)/bin:$PATH"
+        if ! command -v protoc-gen-go >/dev/null; then
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+        fi
+        if ! command -v protoc-gen-go-grpc >/dev/null; then
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+        fi
+        if ! command -v protoc-gen-openapiv2 >/dev/null; then
+          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.24.0
+        fi
+
+  gen-proto:
+    desc: Regenerate Go protobuf, Envoy descriptor, and Swagger docs from proto/*.proto
+    cmds:
+      - task: proto-tools
+      - |
+        set -eu
+        export PATH="$(go env GOPATH)/bin:$PATH"
+        mkdir -p docs dockers/envoy
+        protoc_bin="${PROTOC:-}"
+        if [ -z "$protoc_bin" ]; then
+          for candidate in /opt/homebrew/bin/protoc /usr/local/bin/protoc /usr/bin/protoc "$(command -v protoc 2>/dev/null || true)"; do
+            if [ -n "$candidate" ] && [ -x "$candidate" ] && "$candidate" --version >/dev/null 2>&1; then
+              protoc_bin="$candidate"
+              break
+            fi
+          done
+        fi
+        if [ -z "$protoc_bin" ]; then
+          echo "protoc is required. Install protobuf or set PROTOC=/path/to/protoc."
+          exit 1
+        fi
+        grpc_gateway_dir=$(go list -m -f '{{"{{"}}.Dir{{"}}"}}' github.com/grpc-ecosystem/grpc-gateway/v2)
+        "$protoc_bin" -I. -Ithird_party -I"$grpc_gateway_dir" \
+          --go_out=. --go_opt=module=github/master_go_cqrs \
+          --go-grpc_out=. --go-grpc_opt=module=github/master_go_cqrs \
+          proto/*.proto
+        "$protoc_bin" -I. -Ithird_party -I"$grpc_gateway_dir" \
+          --include_imports --include_source_info \
+          --descriptor_set_out=dockers/envoy/proto.pb \
+          proto/*.proto
+        "$protoc_bin" -I. -Ithird_party -I"$grpc_gateway_dir" \
+          --openapiv2_out=allow_merge=true,merge_file_name=envoy,json_names_for_fields=false,logtostderr=true:docs \
+          proto/*.proto
+
+  swagger-tools:
+    desc: Install Swaggo CLI needed for API Swagger generation
+    cmds:
+      - |
+        set -eu
+        export PATH="$(go env GOPATH)/bin:$PATH"
+        if ! command -v swag >/dev/null; then
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
+        fi
+
+  gen-swagger:
+    desc: Regenerate API Swagger docs from handler annotations and DTO schemas
+    cmds:
+      - task: swagger-tools
+      - |
+        set -eu
+        export PATH="$(go env GOPATH)/bin:$PATH"
+        swag init \
+          --generalInfo main.go \
+          --dir ./cmd/user,./internal \
+          --output docs \
+          --outputTypes json,yaml \
+          --parseInternal \
+          --quiet
+
+  gen-docs:
+    desc: Regenerate API Swagger docs and Envoy gateway OpenAPI docs
+    cmds:
+      - task: gen-swagger
+      - task: gen-proto

@@ -13,7 +13,6 @@ import (
 	"github/master_go_cqrs/internal/httpapi/route"
 	appmiddleware "github/master_go_cqrs/internal/middleware"
 	"github/master_go_cqrs/internal/observability/logger"
-	"github/master_go_cqrs/internal/security/csrf"
 	"github/master_go_cqrs/internal/security/gatewayauth"
 
 	"github.com/go-playground/validator/v10"
@@ -106,7 +105,7 @@ func (s *Server) setupRoutes() {
 func (s *Server) corsMiddleware() echo.MiddlewareFunc {
 	return middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderXRequestID, echo.HeaderAuthorization, csrf.Header, "traceparent", "tracestate", "baggage"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderXRequestID, echo.HeaderAuthorization, "traceparent", "tracestate", "baggage"},
 	})
 }
 

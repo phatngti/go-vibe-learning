@@ -15,43 +15,22 @@ import (
 
 type ServerHandler struct {
 	settlementv1.UnimplementedSettlementServiceServer
-	calculateAndCreditCommission *command.CalculateAndCreditCommissionHandler
-	getBalance                   *query.GetBalanceHandler
-	requestWithdrawal            *command.RequestWithdrawalHandler
-	adjustCreditLimit            *command.AdjustCreditLimitHandler
+	getBalance        *query.GetBalanceHandler
+	requestWithdrawal *command.RequestWithdrawalHandler
+	adjustCreditLimit *command.AdjustCreditLimitHandler
 }
 
-func NewServerHandler(grpcServer *grpc.Server, calculateAndCreditCommission *command.CalculateAndCreditCommissionHandler, getBalance *query.GetBalanceHandler, requestWithdrawal *command.RequestWithdrawalHandler, adjustCreditLimit *command.AdjustCreditLimitHandler) *ServerHandler {
+func NewServerHandler(grpcServer *grpc.Server, getBalance *query.GetBalanceHandler, requestWithdrawal *command.RequestWithdrawalHandler, adjustCreditLimit *command.AdjustCreditLimitHandler) *ServerHandler {
 	h := &ServerHandler{
-		calculateAndCreditCommission: calculateAndCreditCommission,
-		getBalance:                   getBalance,
-		requestWithdrawal:            requestWithdrawal,
-		adjustCreditLimit:            adjustCreditLimit,
+		getBalance:        getBalance,
+		requestWithdrawal: requestWithdrawal,
+		adjustCreditLimit: adjustCreditLimit,
 	}
 	settlementv1.RegisterSettlementServiceServer(grpcServer, h)
 	return h
 }
 
 func RequireServerHandler(*ServerHandler) {}
-
-func (h *ServerHandler) CalculateAndCreditCommission(ctx context.Context, req *settlementv1.CalculateAndCreditCommissionRequest) (*settlementv1.CalculateAndCreditCommissionResponse, error) {
-	bal, commission, err := h.calculateAndCreditCommission.Handle(ctx, &dto.CalculateAndCreditCommission{
-		AgentID:           req.AgentId,
-		TransactionAmount: req.TransactionAmount,
-		Rank:              req.Rank,
-		TransactionID:     req.TransactionId,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to credit commission: %v", err)
-	}
-
-	return &settlementv1.CalculateAndCreditCommissionResponse{
-		AgentId:          bal.AgentID,
-		CommissionAmount: commission,
-		NewBalance:       bal.ActiveBalance,
-		Status:           "CREDITED",
-	}, nil
-}
 
 func (h *ServerHandler) GetAgentBalance(ctx context.Context, req *settlementv1.GetAgentBalanceRequest) (*settlementv1.GetAgentBalanceResponse, error) {
 	bal, err := h.getBalance.Handle(ctx, req.AgentId)

@@ -1,0 +1,515 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: user
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: user
+  ports:
+    - name: http
+      port: 8889
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: user
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: user
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: user
+          image: master-go-cqrs/user:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8889
+          env:
+            - name: SERVICE_NAME
+              value: user
+            - name: CONFIG_PATH
+              value: /root/config/user.yaml
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: user-db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: user-db-password
+            - name: POSTGRES_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: user-db-name
+            - name: KEYCLOAK_ENDPOINT
+              value: http://keycloak:8080
+            - name: KEYCLOAK_CLIENT_ID
+              value: master-go-cqrs
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-client-secret
+            - name: KEYCLOAK_REALM
+              value: backend
+            - name: KEYCLOAK_CUSTOM_HEADER_NAME
+              value: Authorization
+            - name: KAFKA_BROKERS
+              value: kafka.master-go-cqrs.svc.cluster.local:9092
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel:4318
+            - name: OTEL_SERVICE_NAME
+              value: user
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: payment
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+    - name: grpc
+      port: 9081
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payment
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payment
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: payment
+          image: master-go-cqrs/payment:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8081
+            - name: grpc
+              containerPort: 9081
+          env:
+            - name: SERVICE_NAME
+              value: payment
+            - name: CONFIG_PATH
+              value: /root/config/payment.yaml
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: payment-db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: payment-db-password
+            - name: POSTGRES_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: payment-db-name
+            - name: KEYCLOAK_ENDPOINT
+              value: http://keycloak:8080
+            - name: KEYCLOAK_CLIENT_ID
+              value: master-go-cqrs
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-client-secret
+            - name: KEYCLOAK_REALM
+              value: backend
+            - name: KEYCLOAK_CUSTOM_HEADER_NAME
+              value: Authorization
+            - name: GATEWAY_PUBLIC_BASE_URL
+              value: http://localhost:8888
+            - name: KAFKA_BROKERS
+              value: kafka.master-go-cqrs.svc.cluster.local:9092
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel:4318
+            - name: OTEL_SERVICE_NAME
+              value: payment
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: affiliate
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: affiliate
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http
+    - name: grpc
+      port: 9082
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: affiliate
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: affiliate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: affiliate
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: affiliate
+          image: master-go-cqrs/affiliate:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8082
+            - name: grpc
+              containerPort: 9082
+          env:
+            - name: SERVICE_NAME
+              value: affiliate
+            - name: CONFIG_PATH
+              value: /root/config/affiliate.yaml
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: affiliate-db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: affiliate-db-password
+            - name: POSTGRES_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: affiliate-db-name
+            - name: KEYCLOAK_ENDPOINT
+              value: http://keycloak:8080
+            - name: KEYCLOAK_CLIENT_ID
+              value: master-go-cqrs
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-client-secret
+            - name: KEYCLOAK_REALM
+              value: backend
+            - name: KEYCLOAK_CUSTOM_HEADER_NAME
+              value: Authorization
+            - name: KAFKA_BROKERS
+              value: kafka.master-go-cqrs.svc.cluster.local:9092
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel:4318
+            - name: OTEL_SERVICE_NAME
+              value: affiliate
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: settlement
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: settlement
+  ports:
+    - name: http
+      port: 8083
+      targetPort: http
+    - name: grpc
+      port: 9083
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: settlement
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: settlement
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: settlement
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: settlement
+          image: master-go-cqrs/settlement:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8083
+            - name: grpc
+              containerPort: 9083
+          env:
+            - name: SERVICE_NAME
+              value: settlement
+            - name: CONFIG_PATH
+              value: /root/config/settlement.yaml
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: settlement-db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: settlement-db-password
+            - name: POSTGRES_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: settlement-db-name
+            - name: KEYCLOAK_ENDPOINT
+              value: http://keycloak:8080
+            - name: KEYCLOAK_CLIENT_ID
+              value: master-go-cqrs
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-client-secret
+            - name: KEYCLOAK_REALM
+              value: backend
+            - name: KEYCLOAK_CUSTOM_HEADER_NAME
+              value: Authorization
+            - name: KAFKA_BROKERS
+              value: kafka.master-go-cqrs.svc.cluster.local:9092
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel:4318
+            - name: OTEL_SERVICE_NAME
+              value: settlement
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: agent
+  ports:
+    - name: http
+      port: 8084
+      targetPort: http
+    - name: grpc
+      port: 9084
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: agent
+          image: master-go-cqrs/agent:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8084
+            - name: grpc
+              containerPort: 9084
+          env:
+            - name: SERVICE_NAME
+              value: agent
+            - name: CONFIG_PATH
+              value: /root/config/agent.yaml
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: agent-db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: agent-db-password
+            - name: POSTGRES_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: agent-db-name
+            - name: KEYCLOAK_ENDPOINT
+              value: http://keycloak:8080
+            - name: KEYCLOAK_CLIENT_ID
+              value: master-go-cqrs
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: keycloak-client-secret
+            - name: KEYCLOAK_REALM
+              value: backend
+            - name: KEYCLOAK_CUSTOM_HEADER_NAME
+              value: Authorization
+            - name: KAFKA_BROKERS
+              value: kafka.master-go-cqrs.svc.cluster.local:9092
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel:4318
+            - name: OTEL_SERVICE_NAME
+              value: agent
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: orchestrator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: orchestrator
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: orchestrator
+          image: master-go-cqrs/orchestrator:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SERVICE_NAME
+              value: orchestrator
+            - name: CONFIG_PATH
+              value: /root/config/orchestrator.yaml
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: orchestrator-db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: orchestrator-db-password
+            - name: POSTGRES_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: orchestrator-db-name
+            - name: KAFKA_BROKERS
+              value: kafka.master-go-cqrs.svc.cluster.local:9092
+            - name: ORCHESTRATOR_ENGINE
+              value: saga
+            - name: TEMPORAL_ADDRESS
+              value: temporal.master-go-cqrs.svc.cluster.local:7233
+            - name: TEMPORAL_NAMESPACE
+              value: master-go-cqrs
+            - name: TEMPORAL_TASK_QUEUE
+              value: payment-orchestration
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel:4318
+            - name: OTEL_SERVICE_NAME
+              value: orchestrator

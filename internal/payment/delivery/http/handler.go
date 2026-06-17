@@ -13,8 +13,6 @@ import (
 	"github/master_go_cqrs/internal/security/gatewayauth"
 
 	"github.com/labstack/echo/v4"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -24,7 +22,6 @@ type Handler struct {
 	initiatePayment *command.InitiatePaymentHandler
 	processPayment  *command.ProcessPaymentHandler
 	getTransaction  *query.GetTransactionHandler
-	tracer          trace.Tracer
 	authenticate    gatewayauth.Middleware
 }
 
@@ -43,7 +40,6 @@ func NewHandler(params HandlerParams) route.Registrar {
 		initiatePayment: params.InitiatePayment,
 		processPayment:  params.ProcessPayment,
 		getTransaction:  params.GetTransaction,
-		tracer:          otel.Tracer("payment.delivery.http"),
 		authenticate:    params.TokenAuth,
 	}
 }

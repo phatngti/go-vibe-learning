@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github/master_go_cqrs/internal/agent"
+	"github/master_go_cqrs/services/agent"
 
 	"go.uber.org/fx"
 )

@@ -190,21 +190,30 @@ definitions:
         example: generated-key
         type: string
     type: object
+  dto.GetUserResponse:
+    properties:
+      email:
+        type: string
+      email_verified:
+        type: boolean
+      enabled:
+        type: boolean
+      first_name:
+        type: string
+      id:
+        type: string
+      identity_provider:
+        type: string
+      identity_provider_user_id:
+        type: string
+      last_name:
+        type: string
+      username:
+        type: string
+    type: object
   dto.InfoDataDTO:
     properties:
-      info:
-        $ref: '#/definitions/gatewayauth.User'
-    type: object
-  dto.InfoResponseDTO:
-    properties:
-      code:
-        example: info_success
-        type: string
-      data:
-        $ref: '#/definitions/dto.InfoDataDTO'
-      message:
-        example: Info success
-        type: string
+      info: {}
     type: object
   dto.InitiatePayment:
     properties:
@@ -224,21 +233,16 @@ definitions:
         example: customer-123
         type: string
     type: object
-  dto.LoginRequestDTO:
+  dto.ListUsersResponse:
     properties:
-      password:
-        maxLength: 20
-        minLength: 6
-        type: string
-      username:
-        maxLength: 20
-        minLength: 3
-        type: string
-    required:
-    - password
-    - username
+      total:
+        type: integer
+      users:
+        items:
+          $ref: '#/definitions/dto.GetUserResponse'
+        type: array
     type: object
-  dto.LoginResponseDTO:
+  dto.LoginResponse:
     properties:
       access_token:
         type: string
@@ -292,13 +296,6 @@ definitions:
       total_volume:
         example: 2500
         type: number
-    type: object
-  dto.RefreshTokenRequestDTO:
-    properties:
-      refresh_token:
-        type: string
-    required:
-    - refresh_token
     type: object
   dto.RegisterReferral:
     properties:
@@ -354,7 +351,7 @@ definitions:
         example: "2026-06-06T12:00:00+07:00"
         type: string
     type: object
-  dto.VerifyTokenResponseDTO:
+  dto.VerifyTokenResponse:
     properties:
       valid:
         type: boolean
@@ -374,42 +371,43 @@ definitions:
         example: SUCCESS
         type: string
     type: object
-  gatewayauth.ResourceAccess:
+  http.LoginRequestDTO:
     properties:
-      resource_id:
-        type: string
-      resource_name:
-        type: string
-      scopes:
-        items:
-          type: string
-        type: array
-    type: object
-  gatewayauth.User:
-    properties:
-      aud:
-        type: string
-      email:
-        type: string
-      email_verified:
-        type: boolean
-      first_name:
-        type: string
-      id:
-        type: string
-      last_name:
-        type: string
-      resource_access:
-        items:
-          $ref: '#/definitions/gatewayauth.ResourceAccess'
-        type: array
-      roles:
-        items:
-          type: string
-        type: array
-      scope:
+      password:
+        maxLength: 20
+        minLength: 6
         type: string
       username:
+        maxLength: 20
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  http.RefreshTokenRequestDTO:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  http.RegisterUserRequestDTO:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  http.ResponseType:
+    properties:
+      code:
+        type: string
+      data: {}
+      message:
         type: string
     type: object
   response.ErrorDetails:
@@ -434,9 +432,8 @@ definitions:
 host: localhost:8889
 info:
   contact: {}
-  description: HTTP API and service route documentation generated from DTO-backed
-    handlers.
-  title: Master Go CQRS API
+  description: User authentication, identity management, and user query service.
+  title: User Service API
   version: "2.0"
 paths:
   /affiliate/downline/{id}:
@@ -610,7 +607,7 @@ paths:
         "200":
           description: User info
           schema:
-            $ref: '#/definitions/dto.InfoResponseDTO'
+            $ref: '#/definitions/dto.InfoDataDTO'
         "401":
           description: Invalid credentials
           schema:
@@ -631,14 +628,14 @@ paths:
         name: loginRequest
         required: true
         schema:
-          $ref: '#/definitions/dto.LoginRequestDTO'
+          $ref: '#/definitions/http.LoginRequestDTO'
       produces:
       - application/json
       responses:
         "200":
           description: Login successful
           schema:
-            $ref: '#/definitions/dto.LoginResponseDTO'
+            $ref: '#/definitions/dto.LoginResponse'
         "401":
           description: Invalid credentials
           schema:
@@ -661,14 +658,14 @@ paths:
         name: refreshRequest
         required: true
         schema:
-          $ref: '#/definitions/dto.RefreshTokenRequestDTO'
+          $ref: '#/definitions/http.RefreshTokenRequestDTO'
       produces:
       - application/json
       responses:
         "200":
           description: Refresh successful
           schema:
-            $ref: '#/definitions/dto.LoginResponseDTO'
+            $ref: '#/definitions/dto.LoginResponse'
         "401":
           description: Invalid refresh token
           schema:
@@ -680,6 +677,94 @@ paths:
       summary: Refresh access token
       tags:
       - authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register
+      operationId: Handler.register
+      parameters:
+      - description: Request payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.RegisterUserRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.ResponseType'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Register
+      tags:
+      - authentication
+  /auth/users:
+    get:
+      description: Retrieve a paginated list of user identities.
+      parameters:
+      - description: Max results (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Users listed
+          schema:
+            $ref: '#/definitions/dto.ListUsersResponse'
+        "500":
+          description: Failed to list
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - user-management
+  /auth/users/{id}:
+    get:
+      description: Retrieve a user identity by its internal UUID.
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User found
+          schema:
+            $ref: '#/definitions/dto.GetUserResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - user-management
   /auth/verify-token:
     get:
       consumes:
@@ -691,7 +776,7 @@ paths:
         "200":
           description: Verify token successful
           schema:
-            $ref: '#/definitions/dto.VerifyTokenResponseDTO'
+            $ref: '#/definitions/dto.VerifyTokenResponse'
         "401":
           description: Invalid credentials
           schema:
@@ -966,4 +1051,10 @@ securityDefinitions:
     in: header
     name: Authorization
     type: apiKey
+  OAuth2:
+    flow: password
+    scopes:
+      openid: OpenID Connect scope
+    tokenUrl: http://api-gateway.master-go-cqrs.svc.cluster.local:8888/realms/backend/protocol/openid-connect/token
+    type: oauth2
 swagger: "2.0"

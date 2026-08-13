@@ -51,6 +51,27 @@
       "webOrigins": [
         "*"
       ]
+    },
+    {
+      "clientId": "swagger-ui",
+      "name": "Swagger UI (API Documentation)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "redirectUris": [
+        "http://localhost:8888/*",
+        "http://api-gateway.master-go-cqrs.svc.cluster.local:8888/*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
     }
   ],
   "users": [

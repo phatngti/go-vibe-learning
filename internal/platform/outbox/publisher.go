@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github/master_go_cqrs/internal/observability/logger"
 	"github/master_go_cqrs/internal/platform/kafka"
+	"github/master_go_cqrs/internal/platform/observability/logger"
 
 	"github.com/google/uuid"
 	"go.uber.org/fx"

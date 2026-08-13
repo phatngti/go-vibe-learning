@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package agent.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github/master_go_cqrs/contracts/genproto/agent;agentv1";
+
+message ConfigureCallbackRequest {
+  string agent_id = 1;
+  string callback_url = 2;
+  repeated string allowed_ips = 3;
+}
+
+message ConfigureCallbackResponse {
+  string agent_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message GenerateApiKeyRequest {
+  string agent_id = 1;
+}
+
+message GenerateApiKeyResponse {
+  string agent_id = 1;
+  string api_key = 2;
+  string created_at = 3;
+}
+
+message ValidateApiKeyRequest {
+  string api_key = 1;
+}
+
+message ValidateApiKeyResponse {
+  bool valid = 1;
+  string agent_id = 2;
+}
+
+message RecordAuditLogRequest {
+  string agent_id = 1;
+  string action = 2;
+  string details = 3;
+}
+
+message RecordAuditLogResponse {
+  bool success = 1;
+}
+
+service AgentConfigService {
+  rpc ConfigureCallback(ConfigureCallbackRequest) returns (ConfigureCallbackResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agent/config/callback"
+      body: "*"
+    };
+  }
+  rpc GenerateApiKey(GenerateApiKeyRequest) returns (GenerateApiKeyResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agent/config/key/generate"
+      body: "*"
+    };
+  }
+  rpc ValidateApiKey(ValidateApiKeyRequest) returns (ValidateApiKeyResponse);
+  rpc RecordAuditLog(RecordAuditLogRequest) returns (RecordAuditLogResponse);
+}

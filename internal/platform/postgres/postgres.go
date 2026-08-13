@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github/master_go_cqrs/internal/config"
-	"github/master_go_cqrs/internal/observability/logger"
+	"github/master_go_cqrs/internal/platform/config"
+	"github/master_go_cqrs/internal/platform/observability/logger"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -23,11 +23,28 @@ type DB struct {
 	Logger logger.Factory
 }
 
+type transactionContextKey struct{}
+
+// WithTx binds a GORM transaction to a context without exposing a
+// service-specific persistence adapter to transport or application packages.
+func WithTx(ctx context.Context, tx *gorm.DB) context.Context {
+	return context.WithValue(ctx, transactionContextKey{}, tx)
+}
+
+// FromContext returns the bound transaction, or fallback when the context is
+// not transactional.
+func FromContext(ctx context.Context, fallback *gorm.DB) *gorm.DB {
+	if tx, ok := ctx.Value(transactionContextKey{}).(*gorm.DB); ok {
+		return tx
+	}
+	return fallback
+}
+
 var Module = fx.Module("postgres",
 	fx.Provide(New),
 )
 
-func New(lifecycle fx.Lifecycle, cfg *config.Config, logger logger.Factory) (*DB, error) {
+func New(lifecycle fx.Lifecycle, cfg *config.Postgres, logger logger.Factory) (*DB, error) {
 	logger.Bg().Info("Creating Postgres connection")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -46,13 +63,13 @@ func New(lifecycle fx.Lifecycle, cfg *config.Config, logger logger.Factory) (*DB
 	return db, nil
 }
 
-func connect(ctx context.Context, cfg *config.Config, logger logger.Factory) (*DB, error) {
+func connect(ctx context.Context, cfg *config.Postgres, logger logger.Factory) (*DB, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		cfg.Postgres.Host,
-		cfg.Postgres.User,
-		cfg.Postgres.Password,
-		cfg.Postgres.DBName,
-		cfg.Postgres.Port,
+		cfg.Host,
+		cfg.User,
+		cfg.Password,
+		cfg.DBName,
+		cfg.Port,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})

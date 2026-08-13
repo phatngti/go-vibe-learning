@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github/master_go_cqrs/internal/observability/logger"
-	"github/master_go_cqrs/internal/platform/messagebus"
+	"github/master_go_cqrs/contracts/messagebus"
+	"github/master_go_cqrs/internal/platform/observability/logger"
 
 	kafkago "github.com/segmentio/kafka-go"
 	"go.uber.org/zap"

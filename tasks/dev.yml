@@ -27,8 +27,8 @@ tasks:
   dev-ui:
     desc: Show and verify browser UI URLs through Telepresence service DNS
     cmds:
-      - task: k3d-ui-urls
       - task: dev-hosts
+      - task: k3d-ui-urls
 
   dev-hosts:
     desc: Update /etc/hosts for browser access to k3d service DNS names
@@ -40,10 +40,74 @@ tasks:
     cmds:
       - task: k3d-ui-urls
 
+  dev-intercept:
+    desc: Create a Telepresence intercept to redirect k3d service traffic to the local machine
+    vars:
+      SERVICE: '{{default (default "user" .SERVICES) .SERVICE}}'
+    cmds:
+      - |
+        set -eu
+        service="{{.SERVICE}}"
+        case "$service" in
+          user)        port=8889 ;;
+          payment)     port=9081 ;;
+          affiliate)   port=9082 ;;
+          settlement)  port=9083 ;;
+          agent)       port=9084 ;;
+          orchestrator)
+            echo "Skipping intercept for orchestrator (Kafka consumer, no Envoy routes)"
+            exit 0
+            ;;
+          *)
+            echo "Unsupported service for intercept: $service"
+            echo "Expected one of: user payment affiliate settlement agent orchestrator"
+            exit 1
+            ;;
+        esac
+
+        ns="{{.K8S_NAMESPACE}}"
+
+        # Check if intercept already exists
+        if "{{.TELEPRESENCE}}" list --intercepts --namespace "$ns" 2>/dev/null | grep -Eq "(^|[[:space:]])${service}([[:space:]:]|$)"; then
+          echo "Intercept already active for $service"
+          exit 0
+        fi
+
+        echo "Creating Telepresence intercept: $service (port $port)"
+        if ! intercept_output=$("{{.TELEPRESENCE}}" intercept "$service" \
+          --port "${port}:${port}" \
+          --mount false \
+          --namespace "$ns" 2>&1); then
+          echo "$intercept_output"
+          if echo "$intercept_output" | grep -Eqi "intercept with name \"${service}\" already .*exists"; then
+            echo "Intercept already active for $service"
+            exit 0
+          fi
+          exit 1
+        fi
+        echo "$intercept_output"
+        echo "Intercept active: Envoy/Swagger traffic for $service now reaches localhost:$port"
+
+  dev-leave:
+    desc: Leave a Telepresence intercept for a service
+    vars:
+      SERVICE: '{{default (default "user" .SERVICES) .SERVICE}}'
+    cmds:
+      - |
+        set -eu
+        service="{{.SERVICE}}"
+        ns="{{.K8S_NAMESPACE}}"
+        if ! "{{.TELEPRESENCE}}" list --intercepts --namespace "$ns" 2>/dev/null | grep -Eq "(^|[[:space:]])${service}([[:space:]:]|$)"; then
+          echo "No active intercept for $service"
+          exit 0
+        fi
+        "{{.TELEPRESENCE}}" leave "$service"
+        echo "Intercept removed for $service; traffic returns to k3d pod"
+
   dev-run:
     desc: Run one service locally with Air hot reload and k3d dependency access
     vars:
-      SERVICE: '{{default "user" .SERVICE}}'
+      SERVICE: '{{default (default "user" .SERVICES) .SERVICE}}'
     cmds:
       - |
         set -eu
@@ -67,10 +131,10 @@ tasks:
         [build]
         cmd = "go build -o ./{{.DEV_DIR}}/air/$service/service ./cmd/$service"
         entrypoint = ["./{{.DEV_DIR}}/air/$service/service"]
-        include_dir = ["cmd/$service", "internal"]
-        include_file = ["go.mod", "go.sum", "config/$service.yaml"]
+        include_dir = ["cmd/$service", "internal", "services"]
+        include_file = ["go.mod", "go.sum", "services/$service/config/$service.yaml"]
         include_ext = ["go", "mod", "sum", "yaml", "yml"]
-        exclude_dir = [".git", "{{.DEV_DIR}}", "bin", "docs", "dockers", "migrations", "proto", "vendor"]
+        exclude_dir = [".git", "{{.DEV_DIR}}", "bin", "docs", "dockers", "vendor"]
         exclude_regex = ['_test\\.go']
         delay = 500
         stop_on_error = false
@@ -89,13 +153,28 @@ tasks:
         EOF
       - task: ensure-air
       - task: telepresence-ready
+      - task: dev-intercept
+        vars:
+          SERVICE: '{{.SERVICE}}'
       - |
         set -eu
         service="{{.SERVICE}}"
+        ns="{{.K8S_NAMESPACE}}"
         config_file="{{.DEV_DIR}}/air/$service/air.toml"
+
+        # Clean up intercept on exit
+        cleanup() {
+          trap - EXIT
+          echo ""
+          echo "Leaving Telepresence intercept for $service..."
+          "{{.TELEPRESENCE}}" leave "$service" 2>/dev/null || true
+        }
+        trap 'cleanup' EXIT
+
         echo "Running $service locally with k3d dependencies through Telepresence"
+        echo "Swagger/Envoy traffic is intercepted → reaching this local process"
         SERVICE_NAME="$service" \
-        CONFIG_PATH="{{.ROOT_DIR}}/config/$service.yaml" \
+        CONFIG_PATH="{{.ROOT_DIR}}/services/$service/config/$service.yaml" \
           "{{.AIR}}" -c "$config_file"
 
   dev-start:
@@ -183,16 +262,19 @@ tasks:
     cmds:
       - task: k3d-sync-configmaps
       - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/40-gateway.yaml"
-      - kubectl -n "{{.K8S_NAMESPACE}}" rollout restart deployment/swagger-ui deployment/api-gateway
-      - kubectl -n "{{.K8S_NAMESPACE}}" rollout status deployment/swagger-ui --timeout=300s
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout restart deployment/swagger-ui-rest deployment/swagger-ui-grpc deployment/api-gateway
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout status deployment/swagger-ui-rest --timeout=300s
+      - kubectl -n "{{.K8S_NAMESPACE}}" rollout status deployment/swagger-ui-grpc --timeout=300s
       - kubectl -n "{{.K8S_NAMESPACE}}" rollout status deployment/api-gateway --timeout=300s
-      - 'echo "Envoy API gateway: http://localhost:8888"'
-      - 'echo "Swagger UI: http://localhost:8888/api/v1/swagger/"'
+      - 'echo "Envoy API gateway: http://api-gateway.{{.K8S_NAMESPACE}}.svc.cluster.local:8888"'
+      - 'echo "Docs landing:      http://api-gateway.{{.K8S_NAMESPACE}}.svc.cluster.local:8888/api/v1/docs/"'
+      - 'echo "REST Swagger UI:   http://api-gateway.{{.K8S_NAMESPACE}}.svc.cluster.local:8888/api/v1/docs/rest/"'
+      - 'echo "gRPC Swagger UI:   http://api-gateway.{{.K8S_NAMESPACE}}.svc.cluster.local:8888/api/v1/docs/grpc/"'
 
   gateway-stop:
     desc: Scale down the k3d Envoy API gateway and Swagger UI
     cmds:
-      - kubectl -n "{{.K8S_NAMESPACE}}" scale deployment/api-gateway deployment/swagger-ui --replicas=0
+      - kubectl -n "{{.K8S_NAMESPACE}}" scale deployment/api-gateway deployment/swagger-ui-rest deployment/swagger-ui-grpc --replicas=0
 
   gateway-validate:
     desc: Validate generated Envoy configuration
@@ -202,7 +284,7 @@ tasks:
       - docker run --rm -v "{{.ROOT_DIR}}/dockers/envoy:/etc/envoy:ro" envoyproxy/envoy:v1.32-latest envoy --mode validate -c /etc/envoy/envoy.yaml
 
   gateway-smoke:
-    desc: Verify Envoy, Swagger UI, and the generated service OpenAPI document are reachable
+    desc: Verify Envoy, Swagger UIs, and the generated service OpenAPI documents are reachable
     cmds:
       - |
         set -eu
@@ -216,40 +298,47 @@ tasks:
           sleep 1
         done
         if [ "$root_status" != "301" ] && [ "$root_status" != "302" ]; then
-          echo "Expected $gateway_url/ to redirect to Swagger UI, got HTTP $root_status"
+          echo "Expected $gateway_url/ to redirect to docs landing, got HTTP $root_status"
           exit 1
         fi
-        initializer=""
+        # Verify REST Swagger UI
+        rest_initializer=""
         for attempt in $(seq 1 30); do
-          if initializer=$(curl -fsS "$gateway_url/api/v1/swagger/swagger-initializer.js" 2>/dev/null); then
+          if rest_initializer=$(curl -fsS "$gateway_url/api/v1/docs/rest/swagger-initializer.js" 2>/dev/null); then
             break
           fi
           sleep 1
         done
-        if [ -z "$initializer" ]; then
-          echo "Swagger UI initializer was not reachable at $gateway_url/api/v1/swagger/swagger-initializer.js"
+        if [ -z "$rest_initializer" ]; then
+          echo "REST Swagger UI initializer was not reachable at $gateway_url/api/v1/docs/rest/swagger-initializer.js"
           exit 1
         fi
-        if echo "$initializer" | grep -q 'petstore.swagger.io'; then
-          echo "Swagger UI is still configured for the Petstore example"
-          exit 1
-        fi
-        echo "$initializer" | grep -q './swagger.json'
-        swagger=""
+        # Verify gRPC Swagger UI
+        grpc_initializer=""
         for attempt in $(seq 1 30); do
-          if swagger=$(curl -fsS "$gateway_url/api/v1/swagger/swagger.json" 2>/dev/null); then
+          if grpc_initializer=$(curl -fsS "$gateway_url/api/v1/docs/grpc/swagger-initializer.js" 2>/dev/null); then
             break
           fi
           sleep 1
         done
-        if [ -z "$swagger" ]; then
-          echo "Generated Swagger document was not reachable at $gateway_url/api/v1/swagger/swagger.json"
+        if [ -z "$grpc_initializer" ]; then
+          echo "gRPC Swagger UI initializer was not reachable at $gateway_url/api/v1/docs/grpc/swagger-initializer.js"
           exit 1
         fi
-        echo "$swagger" | grep -q '"PaymentService"'
-        echo "$swagger" | grep -q '"AffiliateService"'
-        echo "$swagger" | grep -q '"SettlementService"'
-        echo "$swagger" | grep -q '"AgentConfigService"'
+        # Verify gRPC spec contains expected services
+        grpc_spec=""
+        for attempt in $(seq 1 30); do
+          if grpc_spec=$(curl -fsS "$gateway_url/api/v1/docs/grpc/swagger.json" 2>/dev/null); then
+            break
+          fi
+          sleep 1
+        done
+        if [ -n "$grpc_spec" ]; then
+          echo "$grpc_spec" | grep -q '"PaymentService"'
+          echo "$grpc_spec" | grep -q '"AffiliateService"'
+          echo "$grpc_spec" | grep -q '"SettlementService"'
+          echo "$grpc_spec" | grep -q '"AgentConfigService"'
+        fi
         for attempt in $(seq 1 30); do
           if curl -fsS "$gateway_url/api/v1/health" >/dev/null 2>&1; then
             echo "Gateway smoke check passed: $gateway_url"

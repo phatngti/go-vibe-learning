@@ -5,7 +5,7 @@ tasks:
     desc: Create a migration pair for a service. Usage `task migrate-create SERVICE=payment NAME=create_orders`
     vars:
       SERVICE: '{{default "payment" .SERVICE}}'
-      MIGRATIONS_DIR: '{{default (printf "migrations/%s" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
+      MIGRATIONS_DIR: '{{default (printf "services/%s/migrations" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
       MIGRATION_NAME: '{{default "" .NAME}}'
     cmds:
       - |
@@ -43,7 +43,7 @@ tasks:
     desc: Apply the next pending migration for one service
     vars:
       SERVICE: '{{default "payment" .SERVICE}}'
-      MIGRATIONS_DIR: '{{default (printf "migrations/%s" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
+      MIGRATIONS_DIR: '{{default (printf "services/%s/migrations" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
       DB_NAME: '{{default (printf "master_go_cqrs_%s" (default "payment" .SERVICE)) .DB_NAME}}'
     cmds:
       - |
@@ -94,7 +94,7 @@ tasks:
     desc: Revert the latest applied migration for one service
     vars:
       SERVICE: '{{default "payment" .SERVICE}}'
-      MIGRATIONS_DIR: '{{default (printf "migrations/%s" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
+      MIGRATIONS_DIR: '{{default (printf "services/%s/migrations" (default "payment" .SERVICE)) .MIGRATIONS_DIR}}'
       DB_NAME: '{{default (printf "master_go_cqrs_%s" (default "payment" .SERVICE)) .DB_NAME}}'
     cmds:
       - |

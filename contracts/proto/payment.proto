@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package payment.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github/master_go_cqrs/contracts/genproto/payment;paymentv1";
+
+message InitiatePaymentRequest {
+  string agent_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string customer_id = 4;
+  string callback_url = 5;
+}
+
+message InitiatePaymentResponse {
+  string transaction_id = 1;
+  string payment_url = 2;
+  string status = 3;
+}
+
+message ProcessPaymentRequest {
+  string transaction_id = 1;
+  string payment_method = 2;
+  string card_number = 3;
+  string cvv = 4;
+}
+
+message ProcessPaymentResponse {
+  string transaction_id = 1;
+  string status = 2;
+  string message = 3;
+}
+
+message GetTransactionStatusRequest {
+  string transaction_id = 1;
+}
+
+message GetTransactionStatusResponse {
+  string transaction_id = 1;
+  string status = 2;
+  double amount = 3;
+  string currency = 4;
+  string agent_id = 5;
+  string created_at = 6;
+}
+
+service PaymentService {
+  rpc InitiatePayment(InitiatePaymentRequest) returns (InitiatePaymentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/payment/initiate"
+      body: "*"
+    };
+  }
+  rpc ProcessPayment(ProcessPaymentRequest) returns (ProcessPaymentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/payment/checkout/{transaction_id}"
+      body: "*"
+    };
+  }
+  rpc GetTransactionStatus(GetTransactionStatusRequest) returns (GetTransactionStatusResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/payment/checkout/{transaction_id}"
+    };
+  }
+}

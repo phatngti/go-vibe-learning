@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github/master_go_cqrs/internal/affiliate"
+	"github/master_go_cqrs/services/affiliate"
 
 	"go.uber.org/fx"
 )

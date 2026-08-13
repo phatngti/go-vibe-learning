@@ -126,19 +126,32 @@ __JWT_BYPASS_RULES__
                     socket_address:
                       address: __API_HTTP_ADDRESS__
                       port_value: __API_HTTP_PORT__
-    - name: swagger_ui
+    - name: swagger_ui_rest
       type: LOGICAL_DNS
       connect_timeout: 5s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: swagger_ui
+        cluster_name: swagger_ui_rest
         endpoints:
           - lb_endpoints:
               - endpoint:
                   address:
                     socket_address:
-                      address: __SWAGGER_UI_ADDRESS__
-                      port_value: __SWAGGER_UI_PORT__
+                      address: __SWAGGER_UI_REST_ADDRESS__
+                      port_value: __SWAGGER_UI_REST_PORT__
+    - name: swagger_ui_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: swagger_ui_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __SWAGGER_UI_GRPC_ADDRESS__
+                      port_value: __SWAGGER_UI_GRPC_PORT__
     - name: keycloak
       type: LOGICAL_DNS
       connect_timeout: 5s

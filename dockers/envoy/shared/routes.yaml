@@ -19,17 +19,48 @@ defaults:
 routes:
   # ── Root redirect ──
   - path: /
-    redirect_to: /api/v1/swagger/
+    redirect_to: /api/v1/docs/
     public: true
 
-  # ── Swagger UI ──
-  - prefix: /api/v1/swagger/
-    cluster: swagger_ui
+  # ── API Documentation ──
+  # REST API docs (Swaggo-generated)
+  - prefix: /api/v1/docs/rest/
+    cluster: swagger_ui_rest
     timeout: null
     public: true
 
+  - path: /api/v1/docs/rest
+    redirect_to: /api/v1/docs/rest/
+    public: true
+
+  # gRPC Gateway docs (protoc-generated)
+  - prefix: /api/v1/docs/grpc/
+    cluster: swagger_ui_grpc
+    timeout: null
+    public: true
+
+  - path: /api/v1/docs/grpc
+    redirect_to: /api/v1/docs/grpc/
+    public: true
+
+  # Docs landing page
+  - path: /api/v1/docs/
+    direct_response:
+      status: 200
+      body: '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API Documentation</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#e2e8f0}.container{max-width:640px;padding:3rem 2rem;text-align:center}.title{font-size:2rem;font-weight:700;margin-bottom:.5rem;background:linear-gradient(135deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.subtitle{font-size:1rem;color:#94a3b8;margin-bottom:2.5rem}.cards{display:flex;gap:1.5rem;justify-content:center;flex-wrap:wrap}.card{flex:1;min-width:220px;padding:2rem 1.5rem;background:rgba(30,41,59,.8);border:1px solid rgba(148,163,184,.15);border-radius:1rem;text-decoration:none;color:#e2e8f0;transition:all .2s}.card:hover{transform:translateY(-4px);border-color:#38bdf8;box-shadow:0 8px 30px rgba(56,189,248,.15)}.card h2{font-size:1.25rem;margin-bottom:.5rem}.card p{font-size:.875rem;color:#94a3b8}.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.05em}.badge-rest{background:rgba(52,211,153,.15);color:#34d399}.badge-grpc{background:rgba(129,140,248,.15);color:#818cf8}</style></head><body><div class="container"><h1 class="title">Master Go CQRS</h1><p class="subtitle">Choose an API documentation portal</p><div class="cards"><a class="card" href="/api/v1/docs/rest/"><span class="badge badge-rest">REST</span><h2>REST API</h2><p>HTTP endpoints for auth, users, payments, and more.</p></a><a class="card" href="/api/v1/docs/grpc/"><span class="badge badge-grpc">gRPC</span><h2>gRPC Gateway</h2><p>Protocol Buffer services via JSON transcoding.</p></a></div></div></body></html>'
+    public: true
+
+  - path: /api/v1/docs
+    redirect_to: /api/v1/docs/
+    public: true
+
+  # Backward compatibility: old swagger path redirects to gRPC docs
+  - prefix: /api/v1/swagger/
+    redirect_to: /api/v1/docs/grpc/
+    public: true
+
   - path: /api/v1/swagger
-    redirect_to: /api/v1/swagger/
+    redirect_to: /api/v1/docs/grpc/
     public: true
 
   # ── Payment service ──
@@ -72,6 +103,11 @@ routes:
   - path: /api/v1/agent/config/key/generate
     method: POST
     cluster: agent_grpc
+
+  # ── Keycloak Identity Provider ──
+  - prefix: /realms/
+    cluster: keycloak
+    public: true
 
   # ── Auth routes (HTTP backend) ──
   - path: /api/v1/auth/login

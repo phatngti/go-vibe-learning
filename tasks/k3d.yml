@@ -206,7 +206,8 @@ tasks:
             --kubeconfig "{{.KUBE_CONFIG}}" \
             --manager-namespace "$manager_ns" \
             --mapped-namespaces "{{.K8S_NAMESPACE}}" \
-            --namespace "{{.K8S_NAMESPACE}}"
+            --namespace "{{.K8S_NAMESPACE}}" \
+            --request-timeout "{{.TELEPRESENCE_CONNECT_TIMEOUT}}"
         }
 
         if ! connect_output="$(connect_telepresence 2>&1)"; then
@@ -413,6 +414,7 @@ tasks:
     desc: Sync generated config artifacts into the k3d namespace
     cmds:
       - task: gen-proto
+      - task: gen-swagger
       - task: gen-envoy-config
       - kubectl apply -f "{{.K3D_MANIFEST_DIR}}/00-namespace.yaml"
       - |
@@ -432,6 +434,9 @@ tasks:
           --dry-run=client -o yaml | kubectl apply -f -
         kubectl -n "$ns" create configmap envoy-proto \
           --from-file=proto.pb=dockers/envoy/proto.pb \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n "$ns" create configmap rest-swagger \
+          --from-file=swagger.json=docs/swagger.json \
           --dry-run=client -o yaml | kubectl apply -f -
         kubectl -n "$ns" create configmap envoy-swagger \
           --from-file=envoy.swagger.json=docs/envoy.swagger.json \
@@ -590,7 +595,7 @@ tasks:
           db="master_go_cqrs_${service}"
           user="master_go_cqrs_${service}_user"
           password="master_go_cqrs_${service}_password"
-          for file in "migrations/$service"/*.up.sql; do
+          for file in "services/$service/migrations"/*.up.sql; do
             [ -e "$file" ] || continue
             echo "Applying $file to $db"
             kubectl -n "$ns" exec -i postgres-0 -c postgres -- env PGPASSWORD="$password" psql -v ON_ERROR_STOP=1 -U "$user" -d "$db" < "$file"
@@ -628,7 +633,7 @@ tasks:
       - |
         set -eu
         ns="{{.K8S_NAMESPACE}}"
-        kubectl -n "$ns" rollout restart deployment/user deployment/payment deployment/affiliate deployment/settlement deployment/agent deployment/orchestrator deployment/swagger-ui deployment/api-gateway
+        kubectl -n "$ns" rollout restart deployment/user deployment/payment deployment/affiliate deployment/settlement deployment/agent deployment/orchestrator deployment/swagger-ui-rest deployment/swagger-ui-grpc deployment/api-gateway
 
   k3d-wait-apps:
     desc: Wait for k3d app and gateway deployments
@@ -636,7 +641,7 @@ tasks:
       - |
         set -eu
         ns="{{.K8S_NAMESPACE}}"
-        for deployment in user payment affiliate settlement agent orchestrator swagger-ui api-gateway; do
+        for deployment in user payment affiliate settlement agent orchestrator swagger-ui-rest swagger-ui-grpc api-gateway; do
           kubectl -n "$ns" rollout status "deployment/$deployment" --timeout=300s
         done
 
@@ -698,11 +703,18 @@ tasks:
       - |
         set -eu
         ns="{{.K8S_NAMESPACE}}"
+        gateway_url="${GATEWAY_URL:-http://api-gateway.$ns.svc.cluster.local:8888}"
+        docs_url="$gateway_url/api/v1/docs/"
+        rest_docs_url="$gateway_url/api/v1/docs/rest/"
+        grpc_docs_url="$gateway_url/api/v1/docs/grpc/"
         keycloak_url="http://keycloak.$ns.svc.cluster.local:8080"
         jaeger_url="http://jaeger.$ns.svc.cluster.local:16686"
         temporal_url="http://temporal-ui.$ns.svc.cluster.local:8080"
         kafka_addr="kafka.$ns.svc.cluster.local:9092"
 
+        kubectl -n "$ns" rollout status deployment/api-gateway --timeout=300s
+        kubectl -n "$ns" rollout status deployment/swagger-ui-rest --timeout=300s
+        kubectl -n "$ns" rollout status deployment/swagger-ui-grpc --timeout=300s
         kubectl -n "$ns" rollout status deployment/keycloak --timeout=300s
         kubectl -n "$ns" rollout status deployment/jaeger --timeout=300s
 
@@ -729,21 +741,39 @@ tasks:
         check_url jaeger istio-proxy \
           "http://localhost:16686/api/services" \
           "Jaeger API"
+        for url_label in "REST docs:$rest_docs_url" "gRPC docs:$grpc_docs_url"; do
+          label="${url_label%%:*}"
+          url="${url_label#*:}"
+          for attempt in $(seq 1 30); do
+            if curl -fsS --connect-timeout 3 --max-time 5 "$url" >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "$label did not become ready: $url"
+              exit 1
+            fi
+            sleep 2
+          done
+        done
 
         echo "Telepresence service DNS is ready."
-        echo "Keycloak admin: $keycloak_url/admin"
+        echo "Envoy API gateway:  $gateway_url"
+        echo "Docs landing page:  $docs_url"
+        echo "REST Swagger UI:    $rest_docs_url"
+        echo "gRPC Swagger UI:    $grpc_docs_url"
+        echo "Keycloak admin:     $keycloak_url/admin"
         echo "Keycloak discovery: $keycloak_url/realms/backend/.well-known/openid-configuration"
-        echo "Jaeger UI: $jaeger_url"
+        echo "Jaeger UI:          $jaeger_url"
         if kubectl -n "$ns" get svc/temporal-ui >/dev/null 2>&1; then
           kubectl -n "$ns" rollout status deployment/temporal-ui --timeout=180s
           check_url temporal-ui istio-proxy \
             "http://localhost:8080/" \
             "Temporal UI"
-          echo "Temporal UI: $temporal_url"
+          echo "Temporal UI:        $temporal_url"
         else
           echo "Temporal UI: not deployed; run task k3d-temporal-up first."
         fi
-        echo "Kafka bootstrap: $kafka_addr"
+        echo "Kafka bootstrap:    $kafka_addr"
 
   k3d-hosts:
     desc: Update /etc/hosts with k3d ClusterIP aliases for browser access
@@ -787,6 +817,9 @@ tasks:
         add_service_host keycloak     "keycloak.$ns.svc.cluster.local"
         add_service_host jaeger       "jaeger.$ns.svc.cluster.local"
         add_service_host temporal-ui  "temporal-ui.$ns.svc.cluster.local"
+        add_service_host api-gateway  "api-gateway.$ns.svc.cluster.local"
+        add_service_host swagger-ui-rest "swagger-ui-rest.$ns.svc.cluster.local"
+        add_service_host swagger-ui-grpc "swagger-ui-grpc.$ns.svc.cluster.local"
 
         # Rebuild /etc/hosts: keep everything outside the managed block,
         # then append the freshly resolved entries.

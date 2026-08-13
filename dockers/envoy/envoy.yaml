@@ -54,21 +54,57 @@ static_resources:
                         - match:
                             path: /
                           redirect:
-                            path_redirect: /api/v1/swagger/
+                            path_redirect: /api/v1/docs/
                             response_code: MOVED_PERMANENTLY
                           typed_per_filter_config: &disable_ext_authz
                             envoy.filters.http.ext_authz:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
                               disabled: true
                         - match:
-                            prefix: /api/v1/swagger/
+                            prefix: /api/v1/docs/rest/
                           route:
-                            cluster: swagger_ui
+                            cluster: swagger_ui_rest
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/docs/rest
+                          redirect:
+                            path_redirect: /api/v1/docs/rest/
+                            response_code: MOVED_PERMANENTLY
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            prefix: /api/v1/docs/grpc/
+                          route:
+                            cluster: swagger_ui_grpc
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/docs/grpc
+                          redirect:
+                            path_redirect: /api/v1/docs/grpc/
+                            response_code: MOVED_PERMANENTLY
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/docs/
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API Documentation</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#e2e8f0}.container{max-width:640px;padding:3rem 2rem;text-align:center}.title{font-size:2rem;font-weight:700;margin-bottom:.5rem;background:linear-gradient(135deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.subtitle{font-size:1rem;color:#94a3b8;margin-bottom:2.5rem}.cards{display:flex;gap:1.5rem;justify-content:center;flex-wrap:wrap}.card{flex:1;min-width:220px;padding:2rem 1.5rem;background:rgba(30,41,59,.8);border:1px solid rgba(148,163,184,.15);border-radius:1rem;text-decoration:none;color:#e2e8f0;transition:all .2s}.card:hover{transform:translateY(-4px);border-color:#38bdf8;box-shadow:0 8px 30px rgba(56,189,248,.15)}.card h2{font-size:1.25rem;margin-bottom:.5rem}.card p{font-size:.875rem;color:#94a3b8}.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.05em}.badge-rest{background:rgba(52,211,153,.15);color:#34d399}.badge-grpc{background:rgba(129,140,248,.15);color:#818cf8}</style></head><body><div class="container"><h1 class="title">Master Go CQRS</h1><p class="subtitle">Choose an API documentation portal</p><div class="cards"><a class="card" href="/api/v1/docs/rest/"><span class="badge badge-rest">REST</span><h2>REST API</h2><p>HTTP endpoints for auth, users, payments, and more.</p></a><a class="card" href="/api/v1/docs/grpc/"><span class="badge badge-grpc">gRPC</span><h2>gRPC Gateway</h2><p>Protocol Buffer services via JSON transcoding.</p></a></div></div></body></html>'
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            path: /api/v1/docs
+                          redirect:
+                            path_redirect: /api/v1/docs/
+                            response_code: MOVED_PERMANENTLY
+                          typed_per_filter_config: *disable_ext_authz
+                        - match:
+                            prefix: /api/v1/swagger/
+                          redirect:
+                            path_redirect: /api/v1/docs/grpc/
+                            response_code: MOVED_PERMANENTLY
                           typed_per_filter_config: *disable_ext_authz
                         - match:
                             path: /api/v1/swagger
                           redirect:
-                            path_redirect: /api/v1/swagger/
+                            path_redirect: /api/v1/docs/grpc/
                             response_code: MOVED_PERMANENTLY
                           typed_per_filter_config: *disable_ext_authz
                         - match:
@@ -146,6 +182,12 @@ static_resources:
                           route:
                             cluster: agent_grpc
                             timeout: 60s
+                        - match:
+                            prefix: /realms/
+                          route:
+                            cluster: keycloak
+                            timeout: 60s
+                          typed_per_filter_config: *disable_ext_authz
                         - match:
                             path: /api/v1/auth/login
                             headers:
@@ -244,11 +286,23 @@ static_resources:
                         - match:
                             path: /
                         - match:
+                            prefix: /api/v1/docs/rest/
+                        - match:
+                            path: /api/v1/docs/rest
+                        - match:
+                            prefix: /api/v1/docs/grpc/
+                        - match:
+                            path: /api/v1/docs/grpc
+                        - match:
+                            path: /api/v1/docs
+                        - match:
                             prefix: /api/v1/swagger/
                         - match:
                             path: /api/v1/swagger
                         - match:
                             prefix: /api/v1/payment/checkout/
+                        - match:
+                            prefix: /realms/
                         - match:
                             path: /api/v1/auth/login
                         - match:
@@ -311,18 +365,31 @@ static_resources:
                     socket_address:
                       address: user
                       port_value: 8889
-    - name: swagger_ui
+    - name: swagger_ui_rest
       type: LOGICAL_DNS
       connect_timeout: 5s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: swagger_ui
+        cluster_name: swagger_ui_rest
         endpoints:
           - lb_endpoints:
               - endpoint:
                   address:
                     socket_address:
-                      address: swagger-ui
+                      address: swagger-ui-rest
+                      port_value: 8080
+    - name: swagger_ui_grpc
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: swagger_ui_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: swagger-ui-grpc
                       port_value: 8080
     - name: keycloak
       type: LOGICAL_DNS

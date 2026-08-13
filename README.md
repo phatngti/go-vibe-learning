@@ -4,29 +4,34 @@ Go microservices learning project organized around CQRS, Echo HTTP APIs, gRPC se
 
 ## Architecture
 
-The project is split by feature module under `internal/`:
+The repository is a single Go module split into independently deployed services under `services/`:
 
 - `payment`
 - `affiliate`
 - `agent`
 - `settlement`
-- `authentication`
-- `accesscontrol`
+- `user` (including access control)
 - `orchestrator`
 
-The service modules use this internal CQRS layout:
+Each service exposes only a small Fx facade; implementation packages are protected by Go's `internal` rule:
 
 ```text
-internal/<feature>/
+services/<service>/
+  module.go
+  config/<service>.yaml
+  migrations/
+  internal/
   application/
     command/    # state-changing handlers, transactions, side effects
     query/      # read-only handlers
     dto/        # command/query request DTOs
-  delivery/
+    port/       # repository and gateway interfaces owned by the application
+  transport/
     http/       # Echo route adapters
     grpc/       # gRPC service adapters
-  domain/       # entities, value types, repository/gateway ports
-  repository/   # persistence adapters
+    consumer/   # Kafka inbound adapters
+  domain/       # entities and value types
+  adapter/      # PostgreSQL and external gateway implementations
 ```
 
 Commands mutate state and own transactional work such as saving aggregates, writing audit logs, crediting commissions, charging payment gateways, and writing outbox events. Queries are read-only and delegate to repository ports without side effects.
@@ -49,10 +54,10 @@ Install Go dependencies:
 go mod download
 ```
 
-Each service has its own config file under `config/`. The app reads configuration from `CONFIG_PATH`. If `CONFIG_PATH` is not set, it uses `config/<SERVICE_NAME>.yaml`; an empty `SERVICE_NAME` selects `config/app.yaml`.
+Each service owns its configuration under `services/<service>/config/`. `CONFIG_PATH` remains the runtime override; without it, the service facade loads its owned YAML file.
 
 ```bash
-SERVICE_NAME=payment CONFIG_PATH=./config/payment.yaml go run ./cmd/payment
+SERVICE_NAME=payment CONFIG_PATH=./services/payment/config/payment.yaml go run ./cmd/payment
 ```
 
 For the local integrated runtime, use `task dev-up`. Docker Compose no longer runs the service stack directly; it only provides a Dockerized k3d CLI helper when the host `k3d` binary is not installed.
@@ -70,14 +75,14 @@ The main config sections are:
 - `otel`: OpenTelemetry OTLP HTTP endpoint and service name. Local configs send traces to the OpenTelemetry Collector at `localhost:4318`; the collector forwards them to Jaeger. Override with `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, or `OTEL_SERVICE_NAME` when needed.
 - `orchestrator`: selects the process-wide payment orchestration engine. `saga` is the default; `temporal` uses the same Kafka contracts and shared payment process definition. Override with `ORCHESTRATOR_ENGINE`, `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, and `TEMPORAL_TASK_QUEUE`.
 
-The payment process is defined once under `internal/orchestrator/features/payment`. Persistence-oriented Saga and Temporal workflow implementations are runtime adapters around that definition; feature logic does not inspect the selected engine.
+The payment process is defined once under `services/orchestrator/internal/payment`. Persistence-oriented Saga and Temporal workflow implementations are runtime adapters around that definition; feature logic does not inspect the selected engine.
 
 ## Run Locally
 
 Run the app service:
 
 ```bash
-task run SERVICE=app
+task run SERVICE=user
 ```
 
 Deploy the Docker-backed k3d cluster, Istio, infrastructure, migrations, and app services:
@@ -110,16 +115,17 @@ Run one service locally with Air hot reload while its dependencies continue runn
 task dev-run SERVICE=payment
 ```
 
-The local process uses its existing `config/<service>.yaml`, with Postgres, Kafka, Keycloak, and OTel endpoints overridden to their Kubernetes service names. `task dev-run` also installs or upgrades Telepresence, connects the host to the k3d namespace, and verifies dependency access before Air starts. This does not intercept or replace the Kubernetes workload, so Envoy continues routing to the in-cluster service. Run different local services in separate terminals when needed.
+The local process uses `services/<service>/config/<service>.yaml`, with Postgres, Kafka, Keycloak, and OTel endpoints configured for Kubernetes service DNS. `task dev-run` also installs or upgrades Telepresence, connects the host to the k3d namespace, verifies dependency access, and creates a Telepresence **intercept** so Envoy/Swagger traffic is redirected from the k3d pod to the local process. When the local process exits (Ctrl+C), the intercept is automatically removed and traffic returns to the k3d pod. Run different local services in separate terminals when needed.
 
 After `task dev-up` completes, use these local URLs:
 
 | Surface | URL | What it shows |
 | --- | --- | --- |
-| Envoy API gateway through Istio | http://localhost:8888 | Public HTTP/JSON gateway exposed by the k3d load balancer. `/` redirects to Swagger UI. |
+| Envoy API gateway through Istio | http://localhost:8888 | Public HTTP/JSON gateway exposed by the k3d load balancer. `/` redirects to docs landing page. |
 | Gateway health through Envoy | http://localhost:8888/api/v1/health | Health check routed through Envoy to the user service. |
-| Swagger UI for proto/gateway APIs | http://localhost:8888/api/v1/swagger/ | Swagger UI served from `docs/envoy.swagger.json`, generated from `proto/*.proto`. |
-| Raw proto/gateway OpenAPI JSON | http://localhost:8888/api/v1/swagger/swagger.json | The same gateway OpenAPI document used by Swagger UI. |
+| API docs landing page | http://localhost:8888/api/v1/docs/ | Choose between REST and gRPC API documentation portals. |
+| REST API Swagger UI | http://localhost:8888/api/v1/docs/rest/ | REST API docs from Go handler annotations; supports JWT auth and Keycloak OAuth2 login. |
+| gRPC Gateway Swagger UI | http://localhost:8888/api/v1/docs/grpc/ | gRPC gateway docs from `contracts/proto/*.proto`; supports JWT auth and Keycloak OAuth2 login. |
 | Keycloak admin console | http://keycloak.master-go-cqrs.svc.cluster.local:8080/admin | Reached through Telepresence service DNS. Default local admin credentials are `admin` / `admin`. |
 | Keycloak backend realm discovery | http://keycloak.master-go-cqrs.svc.cluster.local:8080/realms/backend/.well-known/openid-configuration | Reached through Telepresence service DNS. |
 | Jaeger tracing UI | http://jaeger.master-go-cqrs.svc.cluster.local:16686 | Reached through Telepresence service DNS. |
@@ -131,7 +137,7 @@ Connection mechanisms:
 - Telepresence from `task dev-up` lets local processes and browsers resolve and dial Kubernetes service DNS names such as `keycloak.master-go-cqrs.svc.cluster.local:8080`, `postgres.master-go-cqrs.svc.cluster.local:5432`, and `kafka.master-go-cqrs.svc.cluster.local:9092`.
 - `/etc/hosts` is normally not needed because Telepresence owns DNS for the mapped namespace. If Chrome bypasses system DNS or uses an HTTP proxy, run `task dev-hosts`, bypass the proxy for `*.svc.cluster.local`, or use `--noproxy '*'` with `curl`.
 
-The app-service Swagger docs generated from Go handler annotations are written to `docs/swagger.json` and `docs/swagger.yaml` by `task gen-swagger`; they are generated files, not a runtime URL started by `task dev-up`.
+Both Swagger UIs support JWT authentication via the **Authorize** button — paste a JWT token directly or log in through Keycloak OAuth2 (PKCE). The REST Swagger docs are generated from Go handler annotations under `services/*/internal/transport/http` by `task gen-swagger`; the gRPC docs are generated from `contracts/proto/*.proto` by `task gen-proto`.
 
 Check status and follow logs:
 
@@ -139,7 +145,7 @@ Check status and follow logs:
 task dev-status
 task dev-connect
 task dev-disconnect
-task dev-logs SERVICES=app
+task dev-logs SERVICES=user
 task infra-logs INFRA_SERVICE=keycloak
 ```
 
@@ -171,7 +177,7 @@ Envoy is the public HTTP/JSON gateway for service gRPC APIs:
 client -> HTTP/JSON -> Envoy :8888 -> gRPC -> payment/affiliate/settlement/agent
 ```
 
-Gateway routes are generated from `google.api.http` proto annotations. The local gateway uses Envoy's gRPC-JSON transcoder and the generated descriptor at `dockers/envoy/proto.pb`; Swagger/OpenAPI is generated at `docs/envoy.swagger.json`.
+Gateway routes are generated from `google.api.http` proto annotations. The local gateway uses Envoy's gRPC-JSON transcoder and the generated descriptor at `dockers/envoy/proto.pb`; the gRPC gateway OpenAPI document is generated at `docs/envoy.swagger.json` and served by the gRPC Swagger UI at `/api/v1/docs/grpc/`.
 
 Envoy separates shared gateway behavior from environment-specific values:
 
@@ -187,14 +193,16 @@ task gateway-up
 task gateway-validate
 ```
 
-The app service Swagger docs are generated from Go handler annotations and DTO schemas under `internal/*/application/dto`:
+REST and gRPC gateway Swagger docs are generated by separate tasks:
 
 ```bash
-task gen-swagger
-task gen-docs
+task gen-swagger       # REST docs from Go handler annotations under services/
+task gen-proto         # gRPC gateway docs and Envoy descriptor from contracts/proto/*.proto
+task gen-docs          # both of the above
+task swagger-refresh   # regenerate docs, update k3d configmaps, restart Swagger UI/API gateway
 ```
 
-`task dev-up` starts the Docker-backed k3d cluster, installs Istio, deploys infra, migrations, app services, Swagger UI, the OpenTelemetry Collector, Jaeger, and Envoy. Envoy is reachable through Istio at http://localhost:8888, and Swagger UI is reachable at http://localhost:8888/api/v1/swagger/. Internal UIs are reachable through Telepresence service DNS; run `task dev-ui` to verify and print their URLs.
+`task dev-up` starts the Docker-backed k3d cluster, installs Istio, deploys infra, migrations, app services, the Swagger UIs (REST and gRPC), the OpenTelemetry Collector, Jaeger, and Envoy. Envoy is reachable through Istio at http://localhost:8888. The API docs landing page is at http://localhost:8888/api/v1/docs/, with REST docs at `/api/v1/docs/rest/` and gRPC docs at `/api/v1/docs/grpc/`. Internal UIs are reachable through Telepresence service DNS; run `task dev-ui` to verify and print their URLs.
 
 Keycloak is the identity provider for login, refresh, users, roles, and client credentials. After `task dev-up` or `task dev-connect`, clients can obtain tokens from the realm token endpoint:
 
@@ -213,7 +221,7 @@ Payment checkout routes are public. Payment initiation, affiliate, settlement, a
 Taskfile wraps local commands. The root `Taskfile.yml` keeps shared vars and flattened includes; grouped task definitions live under `tasks/*.yml`.
 
 ```bash
-task run SERVICE=app
+task run SERVICE=user
 task run SERVICE=payment
 task build SERVICE=payment
 task build-all
@@ -230,10 +238,10 @@ go test ./...
 Run focused service checks:
 
 ```bash
-go test ./internal/payment/...
-go test ./internal/affiliate/...
-go test ./internal/agent/...
-go test ./internal/settlement/...
+go test ./services/payment/...
+go test ./services/affiliate/...
+go test ./services/agent/...
+go test ./services/settlement/...
 ```
 
 ## Docker and k3d
@@ -252,7 +260,7 @@ docker build --target app -t app-service:latest .
 Or use Task targets:
 
 ```bash
-task image SERVICE=app
+task image SERVICE=user
 task image-all IMAGE_TAG=local
 ```
 
@@ -274,7 +282,7 @@ Useful k3d tasks:
 
 ```bash
 task k3d-status
-task k3d-logs SERVICE=app
+task k3d-logs SERVICE=user
 task dev-ui
 task dev-hosts
 task k3d-kafka-url
@@ -300,10 +308,14 @@ This section walks through developing a feature on your local machine while conn
 │  │ config/       │  kafka.master-go-cqrs...        │  Kafka        │  │
 │  │  payment.yaml │  keycloak.master-go-cqrs...     │  Keycloak     │  │
 │  │               │  otel.master-go-cqrs...         │  OTel/Jaeger  │  │
-│  └──────────────┘                                  └───────────────┘  │
+│  └──────▲───────┘                                  └───────────────┘  │
+│         │                                                            │
+│         │  Telepresence intercept                                    │
+│         │                                                            │
+│  Swagger/Envoy (:8888) ──► k3d Service ──► Telepresence Agent ───┘   │
 │                                                                      │
-│  Envoy (in-cluster) still routes external traffic to the in-cluster  │
-│  deployment. The local process is for development only.              │
+│  Envoy traffic is intercepted and redirected to your local process.  │
+│  On Ctrl+C the intercept is removed and traffic returns to the pod.  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -349,16 +361,29 @@ Supported services: `user`, `payment`, `affiliate`, `settlement`, `agent`, `orch
 
 What happens under the hood:
 
-1. Generates an Air config at `.dev/air/<service>/air.toml` that watches `cmd/<service>/`, `internal/`, `go.mod`, `go.sum`, and `config/<service>.yaml`.
+1. Generates an Air config at `.dev/air/<service>/air.toml` that watches the service, shared platform/contracts, module files, and the service-owned config.
 2. Installs or verifies the pinned Air binary (`.dev/tools/air`).
 3. Ensures Telepresence is connected (installs traffic manager if needed).
 4. Runs a TCP smoke test against Postgres, Kafka, Keycloak, and OTel through cluster DNS.
-5. Starts Air, which builds and runs `./cmd/<service>` with `SERVICE_NAME` and `CONFIG_PATH` set.
+5. Creates a Telepresence **intercept** (`dev-intercept`) to redirect k3d service traffic to the local port.
+6. Starts Air, which builds and runs `./cmd/<service>` with `SERVICE_NAME` and `CONFIG_PATH` set.
+7. On exit (Ctrl+C), automatically removes the intercept so traffic returns to the k3d pod.
 
-The local process reads `config/<service>.yaml` directly. Because Telepresence DNS is active, all endpoints in that config resolve to the k3d infrastructure:
+The intercept maps each service to its Envoy-facing port:
+
+| Service | Intercepted Port | Protocol | Envoy Cluster |
+| --- | --- | --- | --- |
+| user | 8889 | HTTP | `api_http` |
+| payment | 9081 | gRPC | `payment_grpc` |
+| affiliate | 9082 | gRPC | `affiliate_grpc` |
+| settlement | 9083 | gRPC | `settlement_grpc` |
+| agent | 9084 | gRPC | `agent_grpc` |
+| orchestrator | — | — | Skipped (Kafka consumer, no Envoy routes) |
+
+The local process reads `services/<service>/config/<service>.yaml` directly. Because Telepresence DNS is active, all endpoints in that config resolve to the k3d infrastructure:
 
 ```yaml
-# config/payment.yaml — these all resolve through Telepresence
+# services/payment/config/payment.yaml — these all resolve through Telepresence
 postgres:
   host: "postgres.master-go-cqrs.svc.cluster.local"
   port: "5432"
@@ -371,9 +396,14 @@ otel:
   endpoint: "otel.master-go-cqrs.svc.cluster.local:4318"
 ```
 
-Save any Go file in `cmd/<service>/` or `internal/` and Air will automatically rebuild and restart the process.
+Save any Go file in `cmd/<service>/` or `internal/` and Air will automatically rebuild and restart the process. Because the intercept is active, the Swagger UIs and Envoy gateway calls at `http://localhost:8888` will reach your local process immediately — no image rebuild or k3d redeployment needed.
 
-> **Note:** `task dev-run` does **not** intercept or replace the in-cluster deployment. Envoy continues routing external HTTP traffic to the Kubernetes pod. The local process is for development and testing only. To test through the full Envoy gateway, use the in-cluster deployment or call the local process directly on its configured server port.
+To manually manage intercepts without starting Air, use `dev-intercept` and `dev-leave` directly:
+
+```bash
+task dev-intercept SERVICE=payment   # redirect k3d traffic to local port
+task dev-leave SERVICE=payment       # stop intercepting, traffic returns to k3d pod
+```
 
 ### Step 3 — Develop and Test Your Feature
 
@@ -382,11 +412,11 @@ With the local service running and connected to k3d infrastructure, you can:
 **Call the local HTTP API directly:**
 
 ```bash
-# The payment service listens on port 8081 (from config/payment.yaml → server.port)
+# The payment service listens on port 8081 (from services/payment/config/payment.yaml → server.port)
 curl http://localhost:8081/api/v1/health
 ```
 
-**Call the Envoy gateway (routes to in-cluster pods):**
+**Call the Envoy gateway (intercepted → reaches your local process):**
 
 ```bash
 curl http://localhost:8888/api/v1/health
@@ -436,10 +466,10 @@ Each local process connects to the shared k3d Postgres, Kafka, Keycloak, and OTe
 
 If your feature adds new database tables or columns:
 
-1. Create migration files under `migrations/<service>/`:
+1. Create migration files under `services/<service>/migrations/`:
 
 ```bash
-task migration-create SERVICE=payment NAME=add_refund_table
+task migrate-create SERVICE=payment NAME=add_refund_table
 ```
 
 2. Apply migrations to the k3d Postgres:
@@ -543,7 +573,9 @@ task dev-down          # disconnects Telepresence and deletes the k3d cluster
 | --- | --- |
 | `task dev-up` | Full bootstrap: k3d + Istio + infra + apps + Telepresence |
 | `task dev-down` | Tear down Telepresence and delete the k3d cluster |
-| `task dev-run SERVICE=<name>` | Run one service locally with Air hot reload |
+| `task dev-run SERVICE=<name>` | Run one service locally with Air hot reload and Telepresence intercept |
+| `task dev-intercept SERVICE=<name>` | Create a Telepresence intercept to redirect k3d traffic to local |
+| `task dev-leave SERVICE=<name>` | Remove a Telepresence intercept; traffic returns to k3d pod |
 | `task dev-connect` | (Re)connect Telepresence to the k3d namespace |
 | `task dev-disconnect` | Stop Telepresence without stopping k3d |
 | `task dev-status` | Show k3d pods, Istio, and Telepresence state |

@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github/master_go_cqrs/internal/observability/logger"
+	"github/master_go_cqrs/internal/platform/observability/logger"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"

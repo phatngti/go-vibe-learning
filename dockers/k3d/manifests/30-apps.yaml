@@ -164,7 +164,7 @@ spec:
             - name: KEYCLOAK_CUSTOM_HEADER_NAME
               value: Authorization
             - name: GATEWAY_PUBLIC_BASE_URL
-              value: http://localhost:8888
+              value: http://api-gateway.master-go-cqrs.svc.cluster.local:8888
             - name: KAFKA_BROKERS
               value: kafka.master-go-cqrs.svc.cluster.local:9092
             - name: OTEL_EXPORTER_OTLP_ENDPOINT

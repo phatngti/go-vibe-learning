@@ -25,7 +25,7 @@ The task sequence is:
 4. Sync ConfigMaps from existing repo artifacts.
 5. Apply Postgres, Kafka, Jaeger, OTel, and Keycloak manifests.
 6. Run service SQL migrations inside the Postgres pod.
-7. Apply app, Envoy, Swagger UI, Istio Gateway, and VirtualService manifests.
+7. Apply app, Envoy, REST and gRPC Swagger UIs, Istio Gateway, and VirtualService manifests.
 8. Smoke check `http://localhost:8888/api/v1/health`.
 
 If the host does not have `k3d`, the Taskfile uses the `k3d` service from `dockers/docker-compose.yaml`. That compose file is only a CLI helper mounted to the host Docker socket; all runtime services run as Kubernetes workloads in k3d.
@@ -56,7 +56,9 @@ The task manages only the `master_go_cqrs k3d service hosts` block in `/etc/host
 | Surface | Command | URL |
 | --- | --- | --- |
 | Envoy through Istio | `task k3d-deploy` | http://localhost:8888 |
-| Swagger UI | `task k3d-deploy` | http://localhost:8888/api/v1/swagger/ |
+| Docs landing page | `task dev-ui` | http://localhost:8888/api/v1/docs/ |
+| REST Swagger UI | `task dev-ui` | http://localhost:8888/api/v1/docs/rest/ |
+| gRPC Swagger UI | `task dev-ui` | http://localhost:8888/api/v1/docs/grpc/ |
 | Keycloak | `task dev-ui` | http://keycloak.master-go-cqrs.svc.cluster.local:8080/admin |
 | Jaeger | `task dev-ui` | http://jaeger.master-go-cqrs.svc.cluster.local:16686 |
 | Temporal UI | `task k3d-temporal-up`, then `task dev-ui` | http://temporal-ui.master-go-cqrs.svc.cluster.local:8080 |
@@ -69,7 +71,7 @@ The task manages only the `master_go_cqrs k3d service hosts` block in `/etc/host
 - `manifests/20-postgres.yaml` through `24-kafka.yaml`: required infrastructure services, including a single-node Kafka KRaft broker.
 - `manifests/26-temporal.yaml`: optional pinned Temporal Server and UI workloads. Temporal uses dedicated databases in the shared PostgreSQL instance.
 - `manifests/30-apps.yaml`: service deployments and ClusterIP services.
-- `manifests/40-gateway.yaml`: Envoy, Swagger UI, Istio Gateway, and VirtualService.
+- `manifests/40-gateway.yaml`: Envoy, REST and gRPC Swagger UIs, Istio Gateway, and VirtualService.
 
 ## Operations
 

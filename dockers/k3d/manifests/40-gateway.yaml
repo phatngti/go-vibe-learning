@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: swagger-ui
+  name: swagger-ui-rest
   namespace: master-go-cqrs
 spec:
   selector:
-    app.kubernetes.io/name: swagger-ui
+    app.kubernetes.io/name: swagger-ui-rest
   ports:
     - name: http
       port: 8080
@@ -14,17 +14,17 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: swagger-ui
+  name: swagger-ui-rest
   namespace: master-go-cqrs
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: swagger-ui
+      app.kubernetes.io/name: swagger-ui-rest
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: swagger-ui
+        app.kubernetes.io/name: swagger-ui-rest
         app.kubernetes.io/part-of: master-go-cqrs
     spec:
       containers:
@@ -36,9 +36,68 @@ spec:
               containerPort: 8080
           env:
             - name: BASE_URL
-              value: /api/v1/swagger
+              value: /api/v1/docs/rest
             - name: SWAGGER_JSON
               value: /etc/swagger/swagger.json
+            - name: OAUTH_CLIENT_ID
+              value: swagger-ui
+            - name: OAUTH_USE_PKCE
+              value: "true"
+          volumeMounts:
+            - name: rest-swagger
+              mountPath: /etc/swagger/swagger.json
+              subPath: swagger.json
+              readOnly: true
+      volumes:
+        - name: rest-swagger
+          configMap:
+            name: rest-swagger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swagger-ui-grpc
+  namespace: master-go-cqrs
+spec:
+  selector:
+    app.kubernetes.io/name: swagger-ui-grpc
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swagger-ui-grpc
+  namespace: master-go-cqrs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: swagger-ui-grpc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: swagger-ui-grpc
+        app.kubernetes.io/part-of: master-go-cqrs
+    spec:
+      containers:
+        - name: swagger-ui
+          image: swaggerapi/swagger-ui:v5.17.14
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: BASE_URL
+              value: /api/v1/docs/grpc
+            - name: SWAGGER_JSON
+              value: /etc/swagger/swagger.json
+            - name: OAUTH_CLIENT_ID
+              value: swagger-ui
+            - name: OAUTH_USE_PKCE
+              value: "true"
           volumeMounts:
             - name: envoy-swagger
               mountPath: /etc/swagger/swagger.json

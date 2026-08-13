@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package settlement.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github/master_go_cqrs/contracts/genproto/settlement;settlementv1";
+
+message GetAgentBalanceRequest {
+  string agent_id = 1;
+}
+
+message GetAgentBalanceResponse {
+  string agent_id = 1;
+  double active_balance = 2;
+  double credit_limit = 3;
+  string last_updated = 4;
+}
+
+message RequestWithdrawalRequest {
+  string agent_id = 1;
+  double amount = 2;
+  string currency = 3;
+}
+
+message RequestWithdrawalResponse {
+  string withdrawal_id = 1;
+  string agent_id = 2;
+  double amount = 3;
+  string status = 4;
+  string message = 5;
+}
+
+message AdjustCreditLimitRequest {
+  string agent_id = 1;
+  double limit = 2;
+}
+
+message AdjustCreditLimitResponse {
+  string agent_id = 1;
+  double new_limit = 2;
+  bool success = 3;
+}
+
+service SettlementService {
+  rpc GetAgentBalance(GetAgentBalanceRequest) returns (GetAgentBalanceResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/settlement/balance/{agent_id}"
+    };
+  }
+  rpc RequestWithdrawal(RequestWithdrawalRequest) returns (RequestWithdrawalResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/settlement/withdraw"
+      body: "*"
+    };
+  }
+  rpc AdjustCreditLimit(AdjustCreditLimitRequest) returns (AdjustCreditLimitResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/settlement/credit/limit"
+      body: "*"
+    };
+  }
+}

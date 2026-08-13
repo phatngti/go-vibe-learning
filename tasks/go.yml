@@ -26,12 +26,17 @@ tasks:
     cmds:
       - go test ./...
 
+  architecture-check:
+    desc: Enforce service ownership, dependency direction, and binary reachability
+    cmds:
+      - GOCACHE={{.ROOT_DIR}}/.dev/go-build-cache go test ./internal/architecture -run TestDependencyBoundaries -count=1
+
   run:
     desc: Run a service locally
     vars:
       SERVICE: '{{default "user" .SERVICE}}'
     cmds:
-      - SERVICE_NAME={{.SERVICE}} CONFIG_PATH=./config/{{.SERVICE}}.yaml go run ./cmd/{{.SERVICE}}
+      - SERVICE_NAME={{.SERVICE}} CONFIG_PATH=./services/{{.SERVICE}}/config/{{.SERVICE}}.yaml go run ./cmd/{{.SERVICE}}
 
   build:
     desc: Build a service binary

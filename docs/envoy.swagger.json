@@ -855,5 +855,31 @@
         }
       }
     }
-  }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Type \"Bearer\" followed by a space and JWT token."
+    },
+    "OAuth2": {
+      "type": "oauth2",
+      "flow": "password",
+      "tokenUrl": "http://api-gateway.master-go-cqrs.svc.cluster.local:8888/realms/backend/protocol/openid-connect/token",
+      "scopes": {
+        "openid": "OpenID Connect scope"
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    },
+    {
+      "OAuth2": [
+        "openid"
+      ]
+    }
+  ]
 }

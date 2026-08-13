@@ -6,8 +6,8 @@ package keycloak
 import (
 	"context"
 
-	"github/master_go_cqrs/internal/config"
-	"github/master_go_cqrs/internal/observability/logger"
+	"github/master_go_cqrs/internal/platform/config"
+	"github/master_go_cqrs/internal/platform/observability/logger"
 
 	"github.com/Nerzal/gocloak/v13"
 )
@@ -32,16 +32,16 @@ type keycloak struct {
 	logger       logger.Factory
 }
 
-func NewClient(cfg *config.Config, logger logger.Factory) Client {
+func NewClient(cfg *config.Keycloak, logger logger.Factory) Client {
 	logger.Bg().Info("Creating Keycloak connection")
-	client := gocloak.NewClient(cfg.Keycloak.Endpoint)
+	client := gocloak.NewClient(cfg.Endpoint)
 
 	return &keycloak{
 		logger:       logger,
 		Instance:     client,
-		Realm:        cfg.Keycloak.Realm,
-		ClientId:     cfg.Keycloak.ClientID,
-		clientSecret: cfg.Keycloak.ClientSecret,
+		Realm:        cfg.Realm,
+		ClientId:     cfg.ClientID,
+		clientSecret: cfg.ClientSecret,
 	}
 
 }

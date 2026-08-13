@@ -15,6 +15,8 @@ RUN go mod download
 # Copy source code
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
+COPY contracts/ ./contracts/
+COPY services/ ./services/
 COPY docs/ ./docs/
 
 # Build targets
@@ -43,8 +45,13 @@ FROM alpine:latest AS runtime
 WORKDIR /root/
 RUN apk add --no-cache ca-certificates tzdata
 
-# Copy service configs
-COPY config/ ./config/
+# Copy service-owned configs into the stable runtime path expected by manifests.
+COPY services/user/config/user.yaml ./config/user.yaml
+COPY services/payment/config/payment.yaml ./config/payment.yaml
+COPY services/affiliate/config/affiliate.yaml ./config/affiliate.yaml
+COPY services/settlement/config/settlement.yaml ./config/settlement.yaml
+COPY services/agent/config/agent.yaml ./config/agent.yaml
+COPY services/orchestrator/config/orchestrator.yaml ./config/orchestrator.yaml
 
 # Default environments
 ENV CONFIG_PATH=/root/config/user.yaml

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package event.v2;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github/master_go_cqrs/contracts/genproto/eventv2;eventv2";
+
+// EventEnvelope is the production Kafka envelope for v2 integration topics.
+// Payload is an Any so each event can retain a strongly typed Protobuf
+// contract while sharing stable delivery, tenancy, orchestration, and tracing
+// metadata.
+message EventEnvelope {
+  string event_id = 1;
+  string event_type = 2;
+  uint32 schema_version = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+  string tenant_id = 5;
+  string aggregate_id = 6;
+  int64 aggregate_version = 7;
+  string correlation_id = 8;
+  string causation_id = 9;
+  string orchestration_owner = 10;
+  int64 orchestration_generation = 11;
+  string trace_parent = 12;
+  string trace_state = 13;
+  google.protobuf.Any payload = 14;
+
+  // Aggregate type is retained to preserve the routing/debugging metadata in
+  // the legacy JSON envelope during the v1-to-v2 migration.
+  string aggregate_type = 15;
+}

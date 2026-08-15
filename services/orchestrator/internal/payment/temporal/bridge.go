@@ -7,7 +7,6 @@ import (
 	"github/master_go_cqrs/internal/platform/kafka"
 	"github/master_go_cqrs/services/orchestrator/internal/config"
 	processcore "github/master_go_cqrs/services/orchestrator/internal/core/process"
-	"github/master_go_cqrs/services/orchestrator/internal/payment"
 	"github/master_go_cqrs/services/orchestrator/internal/payment/codec"
 )
 
@@ -28,24 +27,29 @@ func (b *Bridge) Handle(ctx context.Context, msg *kafka.Message) error {
 		}
 		return err
 	}
-	if event.Kind == payment.EventPaymentCompleted {
-		return b.gateway.StartPayment(ctx, event)
+	err = b.gateway.DeliverPayment(ctx, event)
+	if errors.Is(err, ErrWorkflowClosed) {
+		return kafka.Permanent(err)
 	}
-	return b.gateway.SignalPayment(ctx, event)
+	return err
+}
+
+func NewPaymentInitiatedSubscription(bridge *Bridge, cfg *config.Config) kafka.Subscription {
+	return kafka.Subscription{Topic: cfg.Kafka.Topics.PaymentInitiatedEvents, GroupID: cfg.ConsumerGroupID("payments-initiated"), Handler: bridge.Handle}
 }
 
 func NewPaymentSubscription(bridge *Bridge, cfg *config.Config) kafka.Subscription {
-	return kafka.Subscription{Topic: cfg.Kafka.Topics.PaymentEvents, GroupID: "orchestrator-payments", Handler: bridge.Handle}
+	return kafka.Subscription{Topic: cfg.Kafka.Topics.PaymentEvents, GroupID: cfg.ConsumerGroupID("payments"), Handler: bridge.Handle}
 }
 
 func NewAffiliateSubscription(bridge *Bridge, cfg *config.Config) kafka.Subscription {
-	return kafka.Subscription{Topic: cfg.Kafka.Topics.AffiliateEvents, GroupID: "orchestrator-affiliate-events", Handler: bridge.Handle}
+	return kafka.Subscription{Topic: cfg.Kafka.Topics.AffiliateEvents, GroupID: cfg.ConsumerGroupID("affiliate-events"), Handler: bridge.Handle}
 }
 
 func NewSettlementSubscription(bridge *Bridge, cfg *config.Config) kafka.Subscription {
-	return kafka.Subscription{Topic: cfg.Kafka.Topics.SettlementEvents, GroupID: "orchestrator-settlement-events", Handler: bridge.Handle}
+	return kafka.Subscription{Topic: cfg.Kafka.Topics.SettlementEvents, GroupID: cfg.ConsumerGroupID("settlement-events"), Handler: bridge.Handle}
 }
 
 func NewAgentSubscription(bridge *Bridge, cfg *config.Config) kafka.Subscription {
-	return kafka.Subscription{Topic: cfg.Kafka.Topics.AgentEvents, GroupID: "orchestrator-agent-events", Handler: bridge.Handle}
+	return kafka.Subscription{Topic: cfg.Kafka.Topics.AgentEvents, GroupID: cfg.ConsumerGroupID("agent-events"), Handler: bridge.Handle}
 }

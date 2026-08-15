@@ -9,6 +9,7 @@ import (
 	"github/master_go_cqrs/contracts/messagebus"
 	"github/master_go_cqrs/internal/platform/eventstore"
 	"github/master_go_cqrs/internal/platform/outbox"
+	sharedmoney "github/master_go_cqrs/internal/shared/money"
 	"github/master_go_cqrs/services/affiliate/internal/application/dto"
 	"github/master_go_cqrs/services/affiliate/internal/application/port"
 	"github/master_go_cqrs/services/affiliate/internal/config"
@@ -58,13 +59,37 @@ func (h *AccumulateVolumeHandler) HandleInTx(ctx context.Context, dbTx *gorm.DB,
 	var oldRank domain.Rank
 
 	err := func() error {
-		var err error
+		incomingMoney, err := messagebus.ResolveMoney(cmd.Money, cmd.Amount, cmd.Currency)
+		if err != nil {
+			return fmt.Errorf("accumulate_volume: invalid money: %w", err)
+		}
+		if !incomingMoney.IsPositive() {
+			return fmt.Errorf("accumulate_volume: amount must be positive")
+		}
+
 		metrics, err = h.repo.GetMetricsForUpdate(ctx, cmd.AgentID)
 		if err != nil {
 			return err
 		}
 
-		metrics.AccumulatedVolume += cmd.Amount
+		currentMoney, err := metricMoney(metrics, incomingMoney)
+		if err != nil {
+			return err
+		}
+		totalMoney, err := currentMoney.Add(incomingMoney)
+		if err != nil {
+			return fmt.Errorf("accumulate_volume: add volume: %w", err)
+		}
+		legacyAmount, err := messagebus.LegacyMajorFloat(incomingMoney)
+		if err != nil {
+			return fmt.Errorf("accumulate_volume: render legacy amount: %w", err)
+		}
+		legacyTotal, err := messagebus.LegacyMajorFloat(totalMoney)
+		if err != nil {
+			return fmt.Errorf("accumulate_volume: render legacy total: %w", err)
+		}
+		metrics.AccumulatedVolume = legacyTotal
+		metrics.AccumulatedVolumeMoney = messagebus.MoneyPointer(totalMoney)
 		if err := h.repo.SaveMetrics(ctx, metrics); err != nil {
 			return err
 		}
@@ -75,7 +100,10 @@ func (h *AccumulateVolumeHandler) HandleInTx(ctx context.Context, dbTx *gorm.DB,
 		}
 
 		oldRank = level.CurrentRank
-		newRank := evaluateRank(metrics.AccumulatedVolume)
+		newRank, err := evaluateRankMoney(totalMoney)
+		if err != nil {
+			return err
+		}
 		finalRank = newRank
 
 		if newRank != oldRank {
@@ -92,8 +120,10 @@ func (h *AccumulateVolumeHandler) HandleInTx(ctx context.Context, dbTx *gorm.DB,
 		volEvt := domain.VolumeAccumulated{
 			TransactionID: cmd.TransactionID,
 			AgentID:       cmd.AgentID,
-			Amount:        cmd.Amount,
-			TotalVolume:   metrics.AccumulatedVolume,
+			Money:         messagebus.MoneyPointer(incomingMoney),
+			TotalMoney:    messagebus.MoneyPointer(totalMoney),
+			Amount:        legacyAmount,
+			TotalVolume:   legacyTotal,
 			CurrentRank:   finalRank,
 			RankPromoted:  promoted,
 			OccurredAt:    now,
@@ -164,15 +194,54 @@ func (h *AccumulateVolumeHandler) HandleInTx(ctx context.Context, dbTx *gorm.DB,
 	return metrics, finalRank, promoted, nil
 }
 
-func evaluateRank(volume float64) domain.Rank {
-	if volume >= 1000000 {
-		return domain.RankDiamond
-	} else if volume >= 100000 {
-		return domain.RankPlatinum
-	} else if volume >= 10000 {
-		return domain.RankGold
-	} else if volume >= 1000 {
-		return domain.RankSilver
+func metricMoney(metrics *domain.AgentMetric, incoming sharedmoney.Money) (sharedmoney.Money, error) {
+	if metrics.AccumulatedVolumeMoney != nil {
+		value, err := sharedmoney.New(
+			metrics.AccumulatedVolumeMoney.AmountMinor,
+			metrics.AccumulatedVolumeMoney.Currency,
+			metrics.AccumulatedVolumeMoney.Exponent,
+		)
+		if err != nil {
+			return sharedmoney.Money{}, fmt.Errorf("accumulate_volume: stored money is invalid: %w", err)
+		}
+		return value, nil
 	}
-	return domain.RankBronze
+	if metrics.AccumulatedVolume != 0 {
+		return sharedmoney.Money{}, domain.ErrMoneyBackfillRequired
+	}
+	return sharedmoney.New(0, incoming.Currency, incoming.Exponent)
+}
+
+func evaluateRankMoney(volume sharedmoney.Money) (domain.Rank, error) {
+	if err := volume.Validate(); err != nil {
+		return "", fmt.Errorf("evaluate affiliate rank: %w", err)
+	}
+	scale := int64(1)
+	for i := int32(0); i < volume.Exponent; i++ {
+		scale *= 10
+	}
+	if volume.AmountMinor >= 1_000_000*scale {
+		return domain.RankDiamond, nil
+	} else if volume.AmountMinor >= 100_000*scale {
+		return domain.RankPlatinum, nil
+	} else if volume.AmountMinor >= 10_000*scale {
+		return domain.RankGold, nil
+	} else if volume.AmountMinor >= 1_000*scale {
+		return domain.RankSilver, nil
+	}
+	return domain.RankBronze, nil
+}
+
+// evaluateRank is kept for legacy tests and v1 compatibility adapters. New
+// command processing uses evaluateRankMoney and never performs float arithmetic.
+func evaluateRank(volume float64) domain.Rank {
+	value, err := sharedmoney.FromLegacyFloat64(volume, "USD")
+	if err != nil {
+		return domain.RankBronze
+	}
+	rank, err := evaluateRankMoney(value)
+	if err != nil {
+		return domain.RankBronze
+	}
+	return rank
 }

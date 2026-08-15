@@ -63,13 +63,17 @@ func (c userClaim) toUser() User {
 
 	return User{
 		ID:             c.Sub,
+		TenantID:       strings.TrimSpace(c.TenantID),
+		AgentID:        strings.TrimSpace(c.AgentID),
 		Username:       c.PreferredUsername,
 		FirstName:      c.GivenName,
 		LastName:       c.FamilyName,
 		Email:          c.Email,
 		Scope:          c.Scope,
+		Scopes:         strings.Fields(c.Scope),
 		Roles:          c.RealmAccess.Roles,
 		Audience:       string(c.Audience),
+		Issuer:         c.Issuer,
 		EmailVerified:  c.EmailVerified,
 		ResourceAccess: resources,
 	}

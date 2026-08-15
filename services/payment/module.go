@@ -31,22 +31,32 @@ var Module = fx.Module("payment",
 	fx.Provide(
 		// Ports → Adapters
 		paymentpostgres.NewTransactionRepository,
+		paymentpostgres.NewPaymentV2Repository,
 		paymentpostgres.NewUnitOfWork,
 		simulator.NewSimulatorGateway,
+		newPaymentProvider,
 
 		// Application — Commands
 		command.NewInitiatePaymentHandler,
 		command.NewProcessPaymentHandler,
+		command.NewPaymentReconciler,
+		command.NewCreatePaymentV2Handler,
+		command.NewHandleProviderWebhookHandler,
 
 		// Application — Queries
 		query.NewGetTransactionHandler,
 		query.NewGetTransactionHistoryHandler,
+		query.NewGetPaymentV2Handler,
 
 		// Delivery
 		route.AsRegistrar(http.NewHandler),
+		route.AsV2Registrar(http.NewV2Handler),
 		grpc.NewServerHandler,
+		grpc.NewV2ServerHandler,
 	),
+	fx.Invoke((*command.PaymentReconciler).Start),
 	fx.Invoke(grpc.RequireServerHandler),
+	fx.Invoke(grpc.RequireV2ServerHandler),
 )
 
 var RuntimeModule = fx.Module("payment-runtime",
@@ -67,6 +77,16 @@ var RuntimeModule = fx.Module("payment-runtime",
 				Topic:       cfg.Kafka.Topics.PaymentEvents,
 				MessageType: messagebus.PaymentCompletedType,
 				StepName:    "payment-completed",
+			},
+			messagebus.PaymentFailedType: {
+				Topic:       cfg.Kafka.Topics.PaymentEvents,
+				MessageType: messagebus.PaymentFailedType,
+				StepName:    "payment-failed",
+			},
+			messagebus.PaymentProcessingUncertainType: {
+				Topic:       cfg.Kafka.Topics.PaymentEvents,
+				MessageType: messagebus.PaymentProcessingUncertainType,
+				StepName:    "payment-processing-uncertain",
 			},
 		}
 	}),

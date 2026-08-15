@@ -1,0 +1,153 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  environment: production
+  imagePullPolicy: IfNotPresent
+  allowedOrigins:
+    - https://app.example.com
+  externalSecretName: master-go-cqrs-runtime
+  configDirectory: /app/config
+  terminationGracePeriodSeconds: 60
+  postgres:
+    host: postgres-rw.database.svc.cluster.local
+    port: "5432"
+    sslMode: verify-full
+    caSecretKey: postgres-ca.crt
+  kafka:
+    brokers: kafka-bootstrap.kafka.svc.cluster.local:9093
+    serializationFormat: protobuf
+    schemaRegistryUrl: https://schema-registry.kafka.svc.cluster.local
+    tls:
+      enabled: true
+      serverName: kafka-bootstrap.kafka.svc.cluster.local
+      caSecretKey: kafka-ca.crt
+    sasl:
+      mechanism: scram-sha-512
+  otel:
+    endpoint: http://otel-gateway.observability.svc.cluster.local:4318
+  keycloak:
+    endpoint: https://identity.example.com
+    realm: backend
+    clientId: master-go-cqrs
+    issuer: https://identity.example.com/realms/backend
+    audience: master-go-cqrs
+    jwksUrl: https://identity.example.com/realms/backend/protocol/openid-connect/certs
+  temporal:
+    address: payments.tmprl.cloud:7233
+    namespace: payments-prod
+    taskQueue: payment-orchestration
+  callback:
+    signingKeyVersion: prod-v1
+    # Reserved example domain. Every real environment must replace this value
+    # with an endpoint origin that completed the ownership challenge.
+    verifiedDomains:
+      - merchant.example
+  topologySpread:
+    enabled: true
+  networkPolicy:
+    enabled: true
+    externalEgressCIDRs: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+migrations:
+  enabled: true
+  image:
+    repository: registry.example/master-go-cqrs/migrations
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  activeDeadlineSeconds: 900
+
+podAnnotations: {}
+podLabels: {}
+
+services:
+  user:
+    enabled: true
+    replicas: 3
+    image:
+      repository: registry.example/master-go-cqrs/user
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    httpPort: 8889
+    grpcPort: 0
+    databaseSecretPrefix: user-db
+    kafkaSecretPrefix: user
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 12, targetCPUUtilizationPercentage: 70}
+  payment:
+    enabled: true
+    replicas: 3
+    image:
+      repository: registry.example/master-go-cqrs/payment
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    httpPort: 8081
+    grpcPort: 9081
+    databaseSecretPrefix: payment-db
+    kafkaSecretPrefix: payment
+    resources:
+      requests: {cpu: 500m, memory: 512Mi}
+      limits: {memory: 2Gi}
+    autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 30, targetCPUUtilizationPercentage: 65}
+  affiliate:
+    enabled: true
+    replicas: 3
+    image:
+      repository: registry.example/master-go-cqrs/affiliate
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    httpPort: 8082
+    grpcPort: 9082
+    databaseSecretPrefix: affiliate-db
+    kafkaSecretPrefix: affiliate
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 20, targetCPUUtilizationPercentage: 70}
+  settlement:
+    enabled: true
+    replicas: 3
+    image:
+      repository: registry.example/master-go-cqrs/settlement
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    httpPort: 8083
+    grpcPort: 9083
+    databaseSecretPrefix: settlement-db
+    kafkaSecretPrefix: settlement
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 20, targetCPUUtilizationPercentage: 70}
+  agent:
+    enabled: true
+    replicas: 3
+    image:
+      repository: registry.example/master-go-cqrs/agent
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    httpPort: 8084
+    grpcPort: 9084
+    databaseSecretPrefix: agent-db
+    kafkaSecretPrefix: agent
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 20, targetCPUUtilizationPercentage: 70}
+  orchestrator:
+    enabled: true
+    replicas: 3
+    image:
+      repository: registry.example/master-go-cqrs/orchestrator
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    httpPort: 0
+    grpcPort: 0
+    databaseSecretPrefix: orchestrator-db
+    kafkaSecretPrefix: orchestrator
+    resources:
+      requests: {cpu: 500m, memory: 512Mi}
+      limits: {memory: 2Gi}
+    # Production worker scaling should use Kafka lag or Temporal task-queue
+    # schedule-to-start latency through KEDA/custom metrics rather than CPU.
+    autoscaling: {enabled: false, minReplicas: 3, maxReplicas: 30, targetCPUUtilizationPercentage: 70}

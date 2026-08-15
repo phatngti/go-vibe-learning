@@ -12,7 +12,19 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+const paymentWorkflowV2ChangeID = "payment-orchestration-v2"
+
+// PaymentWorkflow keeps existing histories deterministic while routing new
+// executions to the recoverable v2 state machine.
 func PaymentWorkflow(ctx workflow.Context, initial payment.Event) (WorkflowState, error) {
+	version := workflow.GetVersion(ctx, paymentWorkflowV2ChangeID, workflow.DefaultVersion, 1)
+	if version == workflow.DefaultVersion {
+		return paymentWorkflowV1(ctx, initial)
+	}
+	return paymentWorkflowV2(ctx, initial)
+}
+
+func paymentWorkflowV1(ctx workflow.Context, initial payment.Event) (WorkflowState, error) {
 	definition := payment.NewDefinition()
 	transition, err := definition.Apply(nil, initial)
 	if err != nil {
@@ -34,7 +46,7 @@ func PaymentWorkflow(ctx workflow.Context, initial payment.Event) (WorkflowState
 		if transition.Command == nil {
 			return state, fmt.Errorf("payment workflow state %q has no command", state.Snapshot.State)
 		}
-		transition, pending, err = executeStep(ctx, activityCtx, signalChannel, definition, &state, *transition.Command, pending)
+		transition, pending, err = executeStepV1(ctx, activityCtx, signalChannel, definition, &state, *transition.Command, pending)
 		if err != nil {
 			return state, err
 		}
@@ -44,7 +56,7 @@ func PaymentWorkflow(ctx workflow.Context, initial payment.Event) (WorkflowState
 	return state, nil
 }
 
-func executeStep(
+func executeStepV1(
 	ctx workflow.Context,
 	activityCtx workflow.Context,
 	signalChannel workflow.ReceiveChannel,
@@ -57,7 +69,7 @@ func executeStep(
 	for attempt := 1; attempt <= policy.MaxAttempts; attempt++ {
 		state.Attempt = attempt
 		if err := workflow.ExecuteActivity(activityCtx, PublishCommandActivityName, command).Get(activityCtx, nil); err != nil {
-			transition, transitionErr := definition.OnTimeout(state.Snapshot, attempt)
+			transition, transitionErr := legacyOnTimeout(definition, state.Snapshot, attempt)
 			if transitionErr != nil {
 				return transition, pending, transitionErr
 			}
@@ -112,7 +124,7 @@ func executeStep(
 			}
 		}
 		cancelTimer()
-		transition, transitionErr := definition.OnTimeout(state.Snapshot, attempt)
+		transition, transitionErr := legacyOnTimeout(definition, state.Snapshot, attempt)
 		if transitionErr != nil {
 			return transition, pending, transitionErr
 		}
@@ -123,6 +135,60 @@ func executeStep(
 		command = *transition.Command
 	}
 	return processcore.Transition[payment.Snapshot, payment.Command]{}, pending, fmt.Errorf("payment workflow exhausted attempts without terminal transition")
+}
+
+func legacyOnTimeout(definition payment.Definition, current payment.Snapshot, attempt int) (processcore.Transition[payment.Snapshot, payment.Command], error) {
+	if current.TransactionID == "" || current.Terminal() {
+		return legacyTransition(current, nil), nil
+	}
+	if current.State == payment.StateWaitingPayment {
+		if attempt >= definition.Policy().MaxAttempts {
+			current.State = payment.StateFailed
+			current.LastError = "payment was not completed in time"
+			return legacyTransition(current, nil), nil
+		}
+		return legacyTransition(current, nil), nil
+	}
+	if attempt >= definition.Policy().MaxAttempts {
+		if current.State == payment.StateWaitingCallback {
+			current.State = payment.StateCallbackFailed
+		} else {
+			current.State = payment.StateFailed
+		}
+		current.LastError = "process step exceeded retry limit"
+		return legacyTransition(current, nil), nil
+	}
+	command := legacyCommandFor(current)
+	if command == nil {
+		return processcore.Transition[payment.Snapshot, payment.Command]{}, fmt.Errorf("payment process has no command for state %q", current.State)
+	}
+	current.LastError = "process step timed out"
+	return legacyTransition(current, command), nil
+}
+
+func legacyTransition(snapshot payment.Snapshot, command *payment.Command) processcore.Transition[payment.Snapshot, payment.Command] {
+	return processcore.Transition[payment.Snapshot, payment.Command]{
+		Snapshot: snapshot, Command: command, Changed: true, Terminal: snapshot.Terminal(),
+	}
+}
+
+func legacyCommandFor(snapshot payment.Snapshot) *payment.Command {
+	command := &payment.Command{
+		TransactionID: snapshot.TransactionID, AgentID: snapshot.AgentID,
+		Amount: snapshot.Amount, Currency: snapshot.Currency, Rank: snapshot.Rank,
+		OrchestrationOwner: snapshot.OrchestrationOwner, OrchestrationGeneration: snapshot.OrchestrationGeneration,
+	}
+	switch snapshot.State {
+	case payment.StateWaitingAffiliate:
+		command.Kind = payment.CommandAccumulateVolume
+	case payment.StateWaitingSettlement:
+		command.Kind = payment.CommandCreditCommission
+	case payment.StateWaitingCallback:
+		command.Kind = payment.CommandDispatchCallback
+	default:
+		return nil
+	}
+	return command
 }
 
 func applyPending(

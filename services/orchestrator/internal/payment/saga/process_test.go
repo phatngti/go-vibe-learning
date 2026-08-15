@@ -24,12 +24,13 @@ import (
 func TestSagaSubscriptionsUseIndependentConsumerGroups(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Kafka.Topics = config.KafkaTopics{
-		PaymentEvents: "payments.events", AffiliateEvents: "affiliate.events",
+		PaymentInitiatedEvents: "payments.initiated", PaymentEvents: "payments.events", AffiliateEvents: "affiliate.events",
 		SettlementEvents: "settlement.events", AgentEvents: "agent.events",
 	}
 	handler := &Handler{}
 
 	subscriptions := []kafka.Subscription{
+		NewPaymentInitiatedSubscription(handler, cfg),
 		NewPaymentSubscription(handler, cfg),
 		NewAffiliateSubscription(handler, cfg),
 		NewSettlementSubscription(handler, cfg),
@@ -44,6 +45,20 @@ func TestSagaSubscriptionsUseIndependentConsumerGroups(t *testing.T) {
 			t.Fatalf("consumer group %q is shared across topic-specific readers", subscription.GroupID)
 		}
 		groups[subscription.GroupID] = struct{}{}
+	}
+}
+
+func TestSagaStartsAtInitiatedAndSchedulesPaymentOutcomeCheck(t *testing.T) {
+	handler, db := newSagaTestHandler(t)
+	mustHandle(t, handler, message("payment-initiated", messagebus.PaymentInitiatedType, messagebus.PaymentInitiated{
+		TransactionID: "tx-init", AgentID: "agent-1", Amount: 100, Currency: "USD",
+	}))
+	var saga paymentsagamodel.Model
+	if err := db.First(&saga, "transaction_id = ?", "tx-init").Error; err != nil {
+		t.Fatal(err)
+	}
+	if saga.State != payment.StateWaitingPayment || saga.RetryCount != 1 || saga.NextRetryAt == nil {
+		t.Fatalf("saga = %+v", saga)
 	}
 }
 
@@ -161,20 +176,27 @@ func newSagaTestHandler(t *testing.T) (*Handler, *gorm.DB) {
 	}
 	statements := []string{
 		`CREATE TABLE public.payment_sagas (
-			transaction_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, amount NUMERIC NOT NULL,
-			currency TEXT NOT NULL, rank TEXT, state TEXT NOT NULL, retry_count INTEGER NOT NULL DEFAULT 0,
+			transaction_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, amount NUMERIC NOT NULL, amount_minor INTEGER,
+			currency TEXT NOT NULL, currency_exponent INTEGER, rank TEXT, state TEXT NOT NULL, resume_state TEXT NOT NULL DEFAULT '', retry_count INTEGER NOT NULL DEFAULT 0,
+			orchestration_owner TEXT NOT NULL DEFAULT 'saga:v1', orchestration_generation INTEGER NOT NULL DEFAULT 1,
 			last_error TEXT, next_retry_at DATETIME, created_at DATETIME, updated_at DATETIME
 		)`,
 		`CREATE TABLE public.inbox_messages (
-			message_id TEXT PRIMARY KEY, topic TEXT NOT NULL, message_type TEXT NOT NULL,
-			status TEXT NOT NULL, created_at DATETIME, processed_at DATETIME
+			consumer_name TEXT NOT NULL, message_id TEXT NOT NULL, topic TEXT NOT NULL,
+			message_type TEXT NOT NULL, status TEXT NOT NULL, created_at DATETIME,
+			processed_at DATETIME, PRIMARY KEY (consumer_name, message_id)
 		)`,
 		`CREATE TABLE public.outbox_events (
 			id TEXT PRIMARY KEY, message_id TEXT NOT NULL UNIQUE, topic TEXT NOT NULL,
 			message_key TEXT NOT NULL, message_type TEXT NOT NULL, aggregate_type TEXT NOT NULL,
 			aggregate_id TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL,
+			schema_version INTEGER NOT NULL DEFAULT 1, aggregate_version INTEGER NOT NULL DEFAULT 0,
+			tenant_id TEXT NOT NULL DEFAULT '', correlation_id TEXT NOT NULL DEFAULT '', causation_id TEXT NOT NULL DEFAULT '',
+			orchestration_owner TEXT NOT NULL DEFAULT '', orchestration_generation INTEGER NOT NULL DEFAULT 0,
+			traceparent TEXT NOT NULL DEFAULT '', tracestate TEXT NOT NULL DEFAULT '',
 			attempts INTEGER NOT NULL DEFAULT 0, available_at DATETIME, locked_at DATETIME,
-			locked_by TEXT, error_log TEXT, created_at DATETIME, processed_at DATETIME
+			locked_by TEXT, error_log TEXT, created_at DATETIME, processed_at DATETIME,
+			dead_at DATETIME
 		)`,
 	}
 	for _, statement := range statements {
@@ -214,6 +236,9 @@ func assertSagaState(t *testing.T, db *gorm.DB, transactionID string, want payme
 	if saga.State != want {
 		t.Fatalf("saga state = %s, want %s", saga.State, want)
 	}
+	if saga.OrchestrationOwner != "saga:v1" || saga.OrchestrationGeneration != 1 {
+		t.Fatalf("saga orchestration identity = %s generation %d", saga.OrchestrationOwner, saga.OrchestrationGeneration)
+	}
 }
 
 func assertOutboxMessage(t *testing.T, db *gorm.DB, messageID, messageType string) {
@@ -224,5 +249,8 @@ func assertOutboxMessage(t *testing.T, db *gorm.DB, messageID, messageType strin
 	}
 	if event.MessageType != messageType {
 		t.Fatalf("outbox message type = %s, want %s", event.MessageType, messageType)
+	}
+	if event.OrchestrationOwner != "saga:v1" || event.OrchestrationGeneration != 1 {
+		t.Fatalf("outbox orchestration identity = %s generation %d", event.OrchestrationOwner, event.OrchestrationGeneration)
 	}
 }

@@ -58,6 +58,9 @@ func TestCommandActivityPublishesExistingKafkaContracts(t *testing.T) {
 		if published.msg.ID != messagebus.MessageID("tx-1", test.step) {
 			t.Fatalf("message id = %q", published.msg.ID)
 		}
+		if published.msg.OrchestrationOwner != "temporal:v1" || published.msg.OrchestrationGeneration != 1 {
+			t.Fatalf("orchestration identity = %q generation %d", published.msg.OrchestrationOwner, published.msg.OrchestrationGeneration)
+		}
 		if !json.Valid(published.msg.Payload) {
 			t.Fatalf("payload is not JSON: %q", published.msg.Payload)
 		}

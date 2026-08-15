@@ -436,10 +436,10 @@ tasks:
           --from-file=proto.pb=dockers/envoy/proto.pb \
           --dry-run=client -o yaml | kubectl apply -f -
         kubectl -n "$ns" create configmap rest-swagger \
-          --from-file=swagger.json=docs/swagger.json \
+          --from-file=swagger.json=docs/api/swagger.json \
           --dry-run=client -o yaml | kubectl apply -f -
         kubectl -n "$ns" create configmap envoy-swagger \
-          --from-file=envoy.swagger.json=docs/envoy.swagger.json \
+          --from-file=envoy.swagger.json=docs/api/envoy.swagger.json \
           --dry-run=client -o yaml | kubectl apply -f -
 
   k3d-apply-infra:

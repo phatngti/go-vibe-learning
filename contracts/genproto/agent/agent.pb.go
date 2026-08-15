@@ -83,12 +83,17 @@ func (x *ConfigureCallbackRequest) GetAllowedIps() []string {
 }
 
 type ConfigureCallbackResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	AgentId            string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Success            bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Message            string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	CallbackStatus     string                 `protobuf:"bytes,4,opt,name=callback_status,json=callbackStatus,proto3" json:"callback_status,omitempty"`
+	ChallengeId        string                 `protobuf:"bytes,5,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	ChallengeToken     string                 `protobuf:"bytes,6,opt,name=challenge_token,json=challengeToken,proto3" json:"challenge_token,omitempty"`
+	ChallengeProofUrl  string                 `protobuf:"bytes,7,opt,name=challenge_proof_url,json=challengeProofUrl,proto3" json:"challenge_proof_url,omitempty"`
+	ChallengeExpiresAt string                 `protobuf:"bytes,8,opt,name=challenge_expires_at,json=challengeExpiresAt,proto3" json:"challenge_expires_at,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ConfigureCallbackResponse) Reset() {
@@ -142,6 +147,289 @@ func (x *ConfigureCallbackResponse) GetMessage() string {
 	return ""
 }
 
+func (x *ConfigureCallbackResponse) GetCallbackStatus() string {
+	if x != nil {
+		return x.CallbackStatus
+	}
+	return ""
+}
+
+func (x *ConfigureCallbackResponse) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *ConfigureCallbackResponse) GetChallengeToken() string {
+	if x != nil {
+		return x.ChallengeToken
+	}
+	return ""
+}
+
+func (x *ConfigureCallbackResponse) GetChallengeProofUrl() string {
+	if x != nil {
+		return x.ChallengeProofUrl
+	}
+	return ""
+}
+
+func (x *ConfigureCallbackResponse) GetChallengeExpiresAt() string {
+	if x != nil {
+		return x.ChallengeExpiresAt
+	}
+	return ""
+}
+
+type VerifyCallbackRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AgentId        string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ChallengeId    string                 `protobuf:"bytes,2,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	ChallengeToken string                 `protobuf:"bytes,3,opt,name=challenge_token,json=challengeToken,proto3" json:"challenge_token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *VerifyCallbackRequest) Reset() {
+	*x = VerifyCallbackRequest{}
+	mi := &file_proto_agent_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyCallbackRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyCallbackRequest) ProtoMessage() {}
+
+func (x *VerifyCallbackRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_agent_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyCallbackRequest.ProtoReflect.Descriptor instead.
+func (*VerifyCallbackRequest) Descriptor() ([]byte, []int) {
+	return file_proto_agent_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *VerifyCallbackRequest) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *VerifyCallbackRequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *VerifyCallbackRequest) GetChallengeToken() string {
+	if x != nil {
+		return x.ChallengeToken
+	}
+	return ""
+}
+
+type VerifyCallbackResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	AgentId            string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Success            bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	CallbackStatus     string                 `protobuf:"bytes,3,opt,name=callback_status,json=callbackStatus,proto3" json:"callback_status,omitempty"`
+	CallbackVerifiedAt string                 `protobuf:"bytes,4,opt,name=callback_verified_at,json=callbackVerifiedAt,proto3" json:"callback_verified_at,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *VerifyCallbackResponse) Reset() {
+	*x = VerifyCallbackResponse{}
+	mi := &file_proto_agent_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyCallbackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyCallbackResponse) ProtoMessage() {}
+
+func (x *VerifyCallbackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_agent_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyCallbackResponse.ProtoReflect.Descriptor instead.
+func (*VerifyCallbackResponse) Descriptor() ([]byte, []int) {
+	return file_proto_agent_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *VerifyCallbackResponse) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *VerifyCallbackResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *VerifyCallbackResponse) GetCallbackStatus() string {
+	if x != nil {
+		return x.CallbackStatus
+	}
+	return ""
+}
+
+func (x *VerifyCallbackResponse) GetCallbackVerifiedAt() string {
+	if x != nil {
+		return x.CallbackVerifiedAt
+	}
+	return ""
+}
+
+type ReplayCallbackRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayCallbackRequest) Reset() {
+	*x = ReplayCallbackRequest{}
+	mi := &file_proto_agent_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayCallbackRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayCallbackRequest) ProtoMessage() {}
+
+func (x *ReplayCallbackRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_agent_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayCallbackRequest.ProtoReflect.Descriptor instead.
+func (*ReplayCallbackRequest) Descriptor() ([]byte, []int) {
+	return file_proto_agent_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ReplayCallbackRequest) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *ReplayCallbackRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ReplayCallbackResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	EventId           string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Status            string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	OutcomeGeneration int64                  `protobuf:"varint,3,opt,name=outcome_generation,json=outcomeGeneration,proto3" json:"outcome_generation,omitempty"`
+	ReplayCount       int32                  `protobuf:"varint,4,opt,name=replay_count,json=replayCount,proto3" json:"replay_count,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ReplayCallbackResponse) Reset() {
+	*x = ReplayCallbackResponse{}
+	mi := &file_proto_agent_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayCallbackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayCallbackResponse) ProtoMessage() {}
+
+func (x *ReplayCallbackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_agent_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayCallbackResponse.ProtoReflect.Descriptor instead.
+func (*ReplayCallbackResponse) Descriptor() ([]byte, []int) {
+	return file_proto_agent_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ReplayCallbackResponse) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *ReplayCallbackResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ReplayCallbackResponse) GetOutcomeGeneration() int64 {
+	if x != nil {
+		return x.OutcomeGeneration
+	}
+	return 0
+}
+
+func (x *ReplayCallbackResponse) GetReplayCount() int32 {
+	if x != nil {
+		return x.ReplayCount
+	}
+	return 0
+}
+
 type GenerateApiKeyRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
@@ -151,7 +439,7 @@ type GenerateApiKeyRequest struct {
 
 func (x *GenerateApiKeyRequest) Reset() {
 	*x = GenerateApiKeyRequest{}
-	mi := &file_proto_agent_proto_msgTypes[2]
+	mi := &file_proto_agent_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -163,7 +451,7 @@ func (x *GenerateApiKeyRequest) String() string {
 func (*GenerateApiKeyRequest) ProtoMessage() {}
 
 func (x *GenerateApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_agent_proto_msgTypes[2]
+	mi := &file_proto_agent_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -176,7 +464,7 @@ func (x *GenerateApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*GenerateApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_agent_proto_rawDescGZIP(), []int{2}
+	return file_proto_agent_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GenerateApiKeyRequest) GetAgentId() string {
@@ -197,7 +485,7 @@ type GenerateApiKeyResponse struct {
 
 func (x *GenerateApiKeyResponse) Reset() {
 	*x = GenerateApiKeyResponse{}
-	mi := &file_proto_agent_proto_msgTypes[3]
+	mi := &file_proto_agent_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -209,7 +497,7 @@ func (x *GenerateApiKeyResponse) String() string {
 func (*GenerateApiKeyResponse) ProtoMessage() {}
 
 func (x *GenerateApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_agent_proto_msgTypes[3]
+	mi := &file_proto_agent_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -222,7 +510,7 @@ func (x *GenerateApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*GenerateApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_agent_proto_rawDescGZIP(), []int{3}
+	return file_proto_agent_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GenerateApiKeyResponse) GetAgentId() string {
@@ -255,7 +543,7 @@ type ValidateApiKeyRequest struct {
 
 func (x *ValidateApiKeyRequest) Reset() {
 	*x = ValidateApiKeyRequest{}
-	mi := &file_proto_agent_proto_msgTypes[4]
+	mi := &file_proto_agent_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +555,7 @@ func (x *ValidateApiKeyRequest) String() string {
 func (*ValidateApiKeyRequest) ProtoMessage() {}
 
 func (x *ValidateApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_agent_proto_msgTypes[4]
+	mi := &file_proto_agent_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +568,7 @@ func (x *ValidateApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*ValidateApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_agent_proto_rawDescGZIP(), []int{4}
+	return file_proto_agent_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ValidateApiKeyRequest) GetApiKey() string {
@@ -300,7 +588,7 @@ type ValidateApiKeyResponse struct {
 
 func (x *ValidateApiKeyResponse) Reset() {
 	*x = ValidateApiKeyResponse{}
-	mi := &file_proto_agent_proto_msgTypes[5]
+	mi := &file_proto_agent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -312,7 +600,7 @@ func (x *ValidateApiKeyResponse) String() string {
 func (*ValidateApiKeyResponse) ProtoMessage() {}
 
 func (x *ValidateApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_agent_proto_msgTypes[5]
+	mi := &file_proto_agent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +613,7 @@ func (x *ValidateApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*ValidateApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_agent_proto_rawDescGZIP(), []int{5}
+	return file_proto_agent_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ValidateApiKeyResponse) GetValid() bool {
@@ -353,7 +641,7 @@ type RecordAuditLogRequest struct {
 
 func (x *RecordAuditLogRequest) Reset() {
 	*x = RecordAuditLogRequest{}
-	mi := &file_proto_agent_proto_msgTypes[6]
+	mi := &file_proto_agent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -365,7 +653,7 @@ func (x *RecordAuditLogRequest) String() string {
 func (*RecordAuditLogRequest) ProtoMessage() {}
 
 func (x *RecordAuditLogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_agent_proto_msgTypes[6]
+	mi := &file_proto_agent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -378,7 +666,7 @@ func (x *RecordAuditLogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordAuditLogRequest.ProtoReflect.Descriptor instead.
 func (*RecordAuditLogRequest) Descriptor() ([]byte, []int) {
-	return file_proto_agent_proto_rawDescGZIP(), []int{6}
+	return file_proto_agent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RecordAuditLogRequest) GetAgentId() string {
@@ -411,7 +699,7 @@ type RecordAuditLogResponse struct {
 
 func (x *RecordAuditLogResponse) Reset() {
 	*x = RecordAuditLogResponse{}
-	mi := &file_proto_agent_proto_msgTypes[7]
+	mi := &file_proto_agent_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -423,7 +711,7 @@ func (x *RecordAuditLogResponse) String() string {
 func (*RecordAuditLogResponse) ProtoMessage() {}
 
 func (x *RecordAuditLogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_agent_proto_msgTypes[7]
+	mi := &file_proto_agent_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -436,7 +724,7 @@ func (x *RecordAuditLogResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordAuditLogResponse.ProtoReflect.Descriptor instead.
 func (*RecordAuditLogResponse) Descriptor() ([]byte, []int) {
-	return file_proto_agent_proto_rawDescGZIP(), []int{7}
+	return file_proto_agent_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RecordAuditLogResponse) GetSuccess() bool {
@@ -455,11 +743,33 @@ const file_proto_agent_proto_rawDesc = "" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12!\n" +
 	"\fcallback_url\x18\x02 \x01(\tR\vcallbackUrl\x12\x1f\n" +
 	"\vallowed_ips\x18\x03 \x03(\tR\n" +
-	"allowedIps\"j\n" +
+	"allowedIps\"\xc1\x02\n" +
 	"\x19ConfigureCallbackResponse\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"2\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12'\n" +
+	"\x0fcallback_status\x18\x04 \x01(\tR\x0ecallbackStatus\x12!\n" +
+	"\fchallenge_id\x18\x05 \x01(\tR\vchallengeId\x12'\n" +
+	"\x0fchallenge_token\x18\x06 \x01(\tR\x0echallengeToken\x12.\n" +
+	"\x13challenge_proof_url\x18\a \x01(\tR\x11challengeProofUrl\x120\n" +
+	"\x14challenge_expires_at\x18\b \x01(\tR\x12challengeExpiresAt\"~\n" +
+	"\x15VerifyCallbackRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12!\n" +
+	"\fchallenge_id\x18\x02 \x01(\tR\vchallengeId\x12'\n" +
+	"\x0fchallenge_token\x18\x03 \x01(\tR\x0echallengeToken\"\xa8\x01\n" +
+	"\x16VerifyCallbackResponse\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12'\n" +
+	"\x0fcallback_status\x18\x03 \x01(\tR\x0ecallbackStatus\x120\n" +
+	"\x14callback_verified_at\x18\x04 \x01(\tR\x12callbackVerifiedAt\"J\n" +
+	"\x15ReplayCallbackRequest\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x9d\x01\n" +
+	"\x16ReplayCallbackResponse\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12-\n" +
+	"\x12outcome_generation\x18\x03 \x01(\x03R\x11outcomeGeneration\x12!\n" +
+	"\freplay_count\x18\x04 \x01(\x05R\vreplayCount\"2\n" +
 	"\x15GenerateApiKeyRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\"k\n" +
 	"\x16GenerateApiKeyResponse\x12\x19\n" +
@@ -477,9 +787,11 @@ const file_proto_agent_proto_rawDesc = "" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12\x18\n" +
 	"\adetails\x18\x03 \x01(\tR\adetails\"2\n" +
 	"\x16RecordAuditLogResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\xcb\x03\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xde\x05\n" +
 	"\x12AgentConfigService\x12\x86\x01\n" +
-	"\x11ConfigureCallback\x12\".agent.v1.ConfigureCallbackRequest\x1a#.agent.v1.ConfigureCallbackResponse\"(\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/api/v1/agent/config/callback\x12\x81\x01\n" +
+	"\x11ConfigureCallback\x12\".agent.v1.ConfigureCallbackRequest\x1a#.agent.v1.ConfigureCallbackResponse\"(\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/api/v1/agent/config/callback\x12\x84\x01\n" +
+	"\x0eVerifyCallback\x12\x1f.agent.v1.VerifyCallbackRequest\x1a .agent.v1.VerifyCallbackResponse\"/\x82\xd3\xe4\x93\x02):\x01*\"$/api/v1/agent/config/callback/verify\x12\x89\x01\n" +
+	"\x0eReplayCallback\x12\x1f.agent.v1.ReplayCallbackRequest\x1a .agent.v1.ReplayCallbackResponse\"4\x82\xd3\xe4\x93\x02.:\x01*\")/api/v1/agent/callbacks/{event_id}/replay\x12\x81\x01\n" +
 	"\x0eGenerateApiKey\x12\x1f.agent.v1.GenerateApiKeyRequest\x1a .agent.v1.GenerateApiKeyResponse\",\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/agent/config/key/generate\x12S\n" +
 	"\x0eValidateApiKey\x12\x1f.agent.v1.ValidateApiKeyRequest\x1a .agent.v1.ValidateApiKeyResponse\x12S\n" +
 	"\x0eRecordAuditLog\x12\x1f.agent.v1.RecordAuditLogRequest\x1a .agent.v1.RecordAuditLogResponseB8Z6github/master_go_cqrs/contracts/genproto/agent;agentv1b\x06proto3"
@@ -496,31 +808,39 @@ func file_proto_agent_proto_rawDescGZIP() []byte {
 	return file_proto_agent_proto_rawDescData
 }
 
-var file_proto_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_proto_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_proto_agent_proto_goTypes = []any{
 	(*ConfigureCallbackRequest)(nil),  // 0: agent.v1.ConfigureCallbackRequest
 	(*ConfigureCallbackResponse)(nil), // 1: agent.v1.ConfigureCallbackResponse
-	(*GenerateApiKeyRequest)(nil),     // 2: agent.v1.GenerateApiKeyRequest
-	(*GenerateApiKeyResponse)(nil),    // 3: agent.v1.GenerateApiKeyResponse
-	(*ValidateApiKeyRequest)(nil),     // 4: agent.v1.ValidateApiKeyRequest
-	(*ValidateApiKeyResponse)(nil),    // 5: agent.v1.ValidateApiKeyResponse
-	(*RecordAuditLogRequest)(nil),     // 6: agent.v1.RecordAuditLogRequest
-	(*RecordAuditLogResponse)(nil),    // 7: agent.v1.RecordAuditLogResponse
+	(*VerifyCallbackRequest)(nil),     // 2: agent.v1.VerifyCallbackRequest
+	(*VerifyCallbackResponse)(nil),    // 3: agent.v1.VerifyCallbackResponse
+	(*ReplayCallbackRequest)(nil),     // 4: agent.v1.ReplayCallbackRequest
+	(*ReplayCallbackResponse)(nil),    // 5: agent.v1.ReplayCallbackResponse
+	(*GenerateApiKeyRequest)(nil),     // 6: agent.v1.GenerateApiKeyRequest
+	(*GenerateApiKeyResponse)(nil),    // 7: agent.v1.GenerateApiKeyResponse
+	(*ValidateApiKeyRequest)(nil),     // 8: agent.v1.ValidateApiKeyRequest
+	(*ValidateApiKeyResponse)(nil),    // 9: agent.v1.ValidateApiKeyResponse
+	(*RecordAuditLogRequest)(nil),     // 10: agent.v1.RecordAuditLogRequest
+	(*RecordAuditLogResponse)(nil),    // 11: agent.v1.RecordAuditLogResponse
 }
 var file_proto_agent_proto_depIdxs = []int32{
-	0, // 0: agent.v1.AgentConfigService.ConfigureCallback:input_type -> agent.v1.ConfigureCallbackRequest
-	2, // 1: agent.v1.AgentConfigService.GenerateApiKey:input_type -> agent.v1.GenerateApiKeyRequest
-	4, // 2: agent.v1.AgentConfigService.ValidateApiKey:input_type -> agent.v1.ValidateApiKeyRequest
-	6, // 3: agent.v1.AgentConfigService.RecordAuditLog:input_type -> agent.v1.RecordAuditLogRequest
-	1, // 4: agent.v1.AgentConfigService.ConfigureCallback:output_type -> agent.v1.ConfigureCallbackResponse
-	3, // 5: agent.v1.AgentConfigService.GenerateApiKey:output_type -> agent.v1.GenerateApiKeyResponse
-	5, // 6: agent.v1.AgentConfigService.ValidateApiKey:output_type -> agent.v1.ValidateApiKeyResponse
-	7, // 7: agent.v1.AgentConfigService.RecordAuditLog:output_type -> agent.v1.RecordAuditLogResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: agent.v1.AgentConfigService.ConfigureCallback:input_type -> agent.v1.ConfigureCallbackRequest
+	2,  // 1: agent.v1.AgentConfigService.VerifyCallback:input_type -> agent.v1.VerifyCallbackRequest
+	4,  // 2: agent.v1.AgentConfigService.ReplayCallback:input_type -> agent.v1.ReplayCallbackRequest
+	6,  // 3: agent.v1.AgentConfigService.GenerateApiKey:input_type -> agent.v1.GenerateApiKeyRequest
+	8,  // 4: agent.v1.AgentConfigService.ValidateApiKey:input_type -> agent.v1.ValidateApiKeyRequest
+	10, // 5: agent.v1.AgentConfigService.RecordAuditLog:input_type -> agent.v1.RecordAuditLogRequest
+	1,  // 6: agent.v1.AgentConfigService.ConfigureCallback:output_type -> agent.v1.ConfigureCallbackResponse
+	3,  // 7: agent.v1.AgentConfigService.VerifyCallback:output_type -> agent.v1.VerifyCallbackResponse
+	5,  // 8: agent.v1.AgentConfigService.ReplayCallback:output_type -> agent.v1.ReplayCallbackResponse
+	7,  // 9: agent.v1.AgentConfigService.GenerateApiKey:output_type -> agent.v1.GenerateApiKeyResponse
+	9,  // 10: agent.v1.AgentConfigService.ValidateApiKey:output_type -> agent.v1.ValidateApiKeyResponse
+	11, // 11: agent.v1.AgentConfigService.RecordAuditLog:output_type -> agent.v1.RecordAuditLogResponse
+	6,  // [6:12] is the sub-list for method output_type
+	0,  // [0:6] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_proto_agent_proto_init() }
@@ -534,7 +854,7 @@ func file_proto_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_agent_proto_rawDesc), len(file_proto_agent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

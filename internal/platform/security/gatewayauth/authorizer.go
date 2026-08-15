@@ -24,6 +24,8 @@ func NewRouteAuthorizer(rules []RouteRule) RouteAuthorizer {
 func DefaultRouteAuthorizer() RouteAuthorizer {
 	return NewRouteAuthorizer([]RouteRule{
 		{Method: http.MethodPost, Path: "/api/v1/payment/initiate", Resource: "payment"},
+		{Method: http.MethodPost, Path: "/api/v2/payments", Resource: "payment"},
+		{Method: http.MethodGet, Prefix: "/api/v2/payments/", Resource: "payment"},
 		{Prefix: "/api/v1/affiliate/", Resource: "affiliate"},
 		{Prefix: "/api/v1/settlement/", Resource: "settlement"},
 		{Prefix: "/api/v1/agent/", Resource: "agent"},

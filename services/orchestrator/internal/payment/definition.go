@@ -29,15 +29,21 @@ func (d Definition) Apply(current *Snapshot, event Event) (processcore.Transitio
 	if current == nil {
 		switch event.Kind {
 		case EventPaymentInitiated:
+			monetaryAmount, _ := event.MonetaryAmount()
+			legacyAmount, _ := legacyMajorFloat(monetaryAmount)
 			snapshot := Snapshot{
 				TransactionID: event.TransactionID, AgentID: event.AgentID,
-				Amount: event.Amount, Currency: event.Currency, State: StateWaitingPayment,
+				Money: moneyPointer(monetaryAmount), Amount: legacyAmount, Currency: monetaryAmount.Currency, State: StateWaitingPayment,
+				OrchestrationOwner: event.OrchestrationOwner, OrchestrationGeneration: event.OrchestrationGeneration,
 			}
 			return transition(snapshot, nil, true), nil
 		case EventPaymentCompleted:
+			monetaryAmount, _ := event.MonetaryAmount()
+			legacyAmount, _ := legacyMajorFloat(monetaryAmount)
 			snapshot := Snapshot{
 				TransactionID: event.TransactionID, AgentID: event.AgentID,
-				Amount: event.Amount, Currency: event.Currency, State: StateWaitingAffiliate,
+				Money: moneyPointer(monetaryAmount), Amount: legacyAmount, Currency: monetaryAmount.Currency, State: StateWaitingAffiliate,
+				OrchestrationOwner: event.OrchestrationOwner, OrchestrationGeneration: event.OrchestrationGeneration,
 			}
 			return transition(snapshot, commandFor(snapshot), true), nil
 		default:
@@ -47,11 +53,38 @@ func (d Definition) Apply(current *Snapshot, event Event) (processcore.Transitio
 	if event.TransactionID != current.TransactionID || event.AgentID != current.AgentID {
 		return processcore.Transition[Snapshot, Command]{}, processcore.Invalid("event identity does not match process %s", current.TransactionID)
 	}
-	if current.Terminal() {
-		return transition(*current, nil, false), nil
+	snapshot := *current
+	if event.Kind == EventPaymentInitiated || event.Kind == EventPaymentCompleted || event.Kind == EventPaymentFailed || event.Kind == EventPaymentUncertain {
+		currentMoney, err := snapshot.MonetaryAmount()
+		if err != nil {
+			return processcore.Transition[Snapshot, Command]{}, processcore.Invalid("stored payment money is invalid: %v", err)
+		}
+		eventMoney, err := event.MonetaryAmount()
+		if err != nil {
+			return processcore.Transition[Snapshot, Command]{}, processcore.Invalid("payment event money is invalid: %v", err)
+		}
+		if currentMoney != eventMoney {
+			return processcore.Transition[Snapshot, Command]{}, processcore.Invalid("payment event money conflicts with process %s", current.TransactionID)
+		}
+		snapshot.Money = moneyPointer(currentMoney)
+		snapshot.Currency = currentMoney.Currency
+		snapshot.Amount, _ = legacyMajorFloat(currentMoney)
+	}
+	if event.OrchestrationOwner != "" {
+		if snapshot.OrchestrationOwner == "" {
+			snapshot.OrchestrationOwner = event.OrchestrationOwner
+			snapshot.OrchestrationGeneration = event.OrchestrationGeneration
+		} else if event.OrchestrationOwner != snapshot.OrchestrationOwner || event.OrchestrationGeneration != snapshot.OrchestrationGeneration {
+			return processcore.Transition[Snapshot, Command]{}, processcore.Invalid("event orchestration owner does not match process %s", current.TransactionID)
+		}
+	}
+	if snapshot.Terminal() {
+		return transition(snapshot, nil, false), nil
+	}
+	if snapshot.State == StateNeedsManualReview {
+		return d.applyLateOutcome(snapshot, event)
 	}
 
-	snapshot := *current
 	switch event.Kind {
 	case EventPaymentInitiated:
 		// Duplicate or late arrival; ignore.
@@ -63,6 +96,26 @@ func (d Definition) Apply(current *Snapshot, event Event) (processcore.Transitio
 			return transition(snapshot, commandFor(snapshot), true), nil
 		}
 		return transition(snapshot, nil, false), nil
+	case EventPaymentFailed:
+		if snapshot.State == StateWaitingPayment {
+			snapshot.State = StateFailed
+			snapshot.LastError = event.Reason
+			return transition(snapshot, nil, true), nil
+		}
+		// A failure that conflicts with already-applied downstream financial
+		// effects needs investigation; it must not rewrite history as FAILED.
+		snapshot.ResumeState = snapshot.State
+		snapshot.State = StateNeedsManualReview
+		snapshot.LastError = "payment failure conflicts with downstream progress: " + event.Reason
+		return transition(snapshot, nil, true), nil
+	case EventPaymentUncertain:
+		if snapshot.State != StateWaitingPayment {
+			return transition(snapshot, nil, false), nil
+		}
+		snapshot.ResumeState = snapshot.State
+		snapshot.State = StateNeedsManualReview
+		snapshot.LastError = event.Reason
+		return transition(snapshot, nil, true), nil
 	case EventVolumeAccumulated:
 		if snapshot.State == StateWaitingPayment {
 			return processcore.Transition[Snapshot, Command]{}, processcore.NotReady(snapshot.TransactionID, string(event.Kind))
@@ -108,24 +161,17 @@ func (d Definition) OnTimeout(current Snapshot, attempt int) (processcore.Transi
 	if current.TransactionID == "" || current.Terminal() {
 		return transition(current, nil, false), nil
 	}
-	// StateWaitingPayment has no outbound command to retry; if the payment
-	// does not complete within the retry budget the process is abandoned.
-	if current.State == StateWaitingPayment {
-		if attempt >= d.Policy().MaxAttempts {
-			current.State = StateFailed
-			current.LastError = "payment was not completed in time"
-			return transition(current, nil, true), nil
-		}
-		return transition(current, nil, false), nil
-	}
 	if attempt >= d.Policy().MaxAttempts {
-		if current.State == StateWaitingCallback {
-			current.State = StateCallbackFailed
-		} else {
-			current.State = StateFailed
-		}
-		current.LastError = "process step exceeded retry limit"
+		current.ResumeState = current.State
+		current.State = StateNeedsManualReview
+		current.LastError = "process step exceeded retry limit; outcome is not definitive"
 		return transition(current, nil, true), nil
+	}
+	// Waiting for a provider result has no command to reissue. The payment
+	// service owns provider reconciliation and will publish a definitive event.
+	if current.State == StateWaitingPayment {
+		current.LastError = "payment result has not arrived"
+		return transition(current, nil, false), nil
 	}
 	command := commandFor(current)
 	if command == nil {
@@ -139,14 +185,24 @@ func ValidateEvent(event Event) error {
 	if event.TransactionID == "" || event.AgentID == "" {
 		return processcore.Invalid("transaction_id and agent_id are required")
 	}
+	if (event.OrchestrationOwner == "") != (event.OrchestrationGeneration == 0) || event.OrchestrationGeneration < 0 {
+		return processcore.Invalid("orchestration owner and positive generation must be provided together")
+	}
 	switch event.Kind {
 	case EventPaymentInitiated:
-		if event.Amount <= 0 || event.Currency == "" {
+		monetaryAmount, err := event.MonetaryAmount()
+		if err != nil || !monetaryAmount.IsPositive() {
 			return processcore.Invalid("payment amount and currency are required")
 		}
 	case EventPaymentCompleted:
-		if event.Amount <= 0 || event.Currency == "" {
+		monetaryAmount, err := event.MonetaryAmount()
+		if err != nil || !monetaryAmount.IsPositive() {
 			return processcore.Invalid("payment amount and currency are required")
+		}
+	case EventPaymentFailed, EventPaymentUncertain:
+		monetaryAmount, err := event.MonetaryAmount()
+		if err != nil || !monetaryAmount.IsPositive() || event.Reason == "" {
+			return processcore.Invalid("payment amount, currency, and outcome reason are required")
 		}
 	case EventVolumeAccumulated:
 		if event.Rank == "" {
@@ -163,6 +219,28 @@ func ValidateEvent(event Event) error {
 	return nil
 }
 
+func (d Definition) applyLateOutcome(review Snapshot, event Event) (processcore.Transition[Snapshot, Command], error) {
+	if review.ResumeState == "" || review.ResumeState == StateNeedsManualReview {
+		return processcore.Transition[Snapshot, Command]{}, processcore.Invalid("review state %s has no resumable step", review.TransactionID)
+	}
+	resumed := review
+	resumed.State = review.ResumeState
+	resumed.ResumeState = ""
+	result, err := d.Apply(&resumed, event)
+	if err != nil {
+		return result, err
+	}
+	if !result.Changed && result.Command == nil && !result.Terminal {
+		// Duplicate or stale events do not clear the operational review state.
+		return transition(review, nil, false), nil
+	}
+	if result.Snapshot.State != StateNeedsManualReview {
+		result.Snapshot.ResumeState = ""
+		result.Snapshot.LastError = ""
+	}
+	return transition(result.Snapshot, result.Command, true), nil
+}
+
 func transition(snapshot Snapshot, command *Command, changed bool) processcore.Transition[Snapshot, Command] {
 	return processcore.Transition[Snapshot, Command]{
 		Snapshot: snapshot, Command: command, Changed: changed, Terminal: snapshot.Terminal(),
@@ -173,6 +251,11 @@ func commandFor(snapshot Snapshot) *Command {
 	command := &Command{
 		TransactionID: snapshot.TransactionID, AgentID: snapshot.AgentID,
 		Amount: snapshot.Amount, Currency: snapshot.Currency, Rank: snapshot.Rank,
+		OrchestrationOwner: snapshot.OrchestrationOwner, OrchestrationGeneration: snapshot.OrchestrationGeneration,
+	}
+	if monetaryAmount, err := snapshot.MonetaryAmount(); err == nil {
+		command.Money = moneyPointer(monetaryAmount)
+		command.Currency = monetaryAmount.Currency
 	}
 	switch snapshot.State {
 	case StateWaitingAffiliate:

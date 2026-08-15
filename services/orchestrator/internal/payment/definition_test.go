@@ -73,26 +73,50 @@ func TestDefinitionRejectsInvalidAndMissingStart(t *testing.T) {
 
 func TestDefinitionTimeoutPolicy(t *testing.T) {
 	definition := NewDefinition()
-	states := []struct {
-		state State
-		want  State
-	}{
-		{StateWaitingAffiliate, StateFailed},
-		{StateWaitingSettlement, StateFailed},
-		{StateWaitingCallback, StateCallbackFailed},
-	}
-	for _, test := range states {
-		t.Run(string(test.state), func(t *testing.T) {
-			snapshot := Snapshot{TransactionID: "tx-1", AgentID: "agent-1", Amount: 100, Currency: "USD", Rank: "SILVER", State: test.state}
+	states := []State{StateWaitingAffiliate, StateWaitingSettlement, StateWaitingCallback}
+	for _, state := range states {
+		t.Run(string(state), func(t *testing.T) {
+			snapshot := Snapshot{TransactionID: "tx-1", AgentID: "agent-1", Amount: 100, Currency: "USD", Rank: "SILVER", State: state}
 			retry, err := definition.OnTimeout(snapshot, MaxAttempts-1)
 			if err != nil || retry.Command == nil || retry.Terminal {
 				t.Fatalf("retry = %+v, error = %v", retry, err)
 			}
 			exhausted, err := definition.OnTimeout(snapshot, MaxAttempts)
-			if err != nil || exhausted.Snapshot.State != test.want || !exhausted.Terminal {
+			if err != nil || exhausted.Snapshot.State != StateNeedsManualReview || exhausted.Snapshot.ResumeState != state || exhausted.Terminal {
 				t.Fatalf("exhausted = %+v, error = %v", exhausted, err)
 			}
 		})
+	}
+}
+
+func TestDefinitionLateEventRecoversManualReview(t *testing.T) {
+	definition := NewDefinition()
+	review := Snapshot{
+		TransactionID: "tx-1", AgentID: "agent-1", Amount: 100, Currency: "USD",
+		State: StateNeedsManualReview, ResumeState: StateWaitingAffiliate,
+	}
+	transition, err := definition.Apply(&review, Event{
+		Kind: EventVolumeAccumulated, TransactionID: "tx-1", AgentID: "agent-1", Rank: "SILVER",
+	})
+	if err != nil || transition.Snapshot.State != StateWaitingSettlement || transition.Snapshot.ResumeState != "" || transition.Command == nil {
+		t.Fatalf("transition = %+v, error = %v", transition, err)
+	}
+}
+
+func TestDefinitionDistinguishesDefinitiveAndUncertainPaymentOutcomes(t *testing.T) {
+	definition := NewDefinition()
+	waiting := Snapshot{TransactionID: "tx-1", AgentID: "agent-1", Amount: 100, Currency: "USD", State: StateWaitingPayment}
+	failed, err := definition.Apply(&waiting, Event{
+		Kind: EventPaymentFailed, TransactionID: "tx-1", AgentID: "agent-1", Amount: 100, Currency: "USD", Reason: "declined",
+	})
+	if err != nil || failed.Snapshot.State != StateFailed || !failed.Terminal {
+		t.Fatalf("failed = %+v, error = %v", failed, err)
+	}
+	uncertain, err := definition.Apply(&waiting, Event{
+		Kind: EventPaymentUncertain, TransactionID: "tx-1", AgentID: "agent-1", Amount: 100, Currency: "USD", Reason: "provider timeout",
+	})
+	if err != nil || uncertain.Snapshot.State != StateNeedsManualReview || uncertain.Terminal {
+		t.Fatalf("uncertain = %+v, error = %v", uncertain, err)
 	}
 }
 

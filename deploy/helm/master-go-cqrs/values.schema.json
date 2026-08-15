@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["global", "services", "migrations"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["environment", "allowedOrigins", "externalSecretName", "postgres", "kafka", "otel", "keycloak", "temporal", "callback"],
+      "properties": {
+        "environment": {"const": "production"},
+        "allowedOrigins": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^https://"}},
+        "externalSecretName": {"type": "string", "minLength": 1},
+        "postgres": {
+          "type": "object",
+          "required": ["host", "port", "sslMode", "caSecretKey"],
+          "properties": {
+            "sslMode": {"const": "verify-full"},
+            "caSecretKey": {"type": "string", "minLength": 1}
+          }
+        },
+        "kafka": {
+          "type": "object",
+          "required": ["brokers", "serializationFormat", "schemaRegistryUrl", "tls", "sasl"],
+          "properties": {
+            "serializationFormat": {"enum": ["json", "protobuf"]},
+            "schemaRegistryUrl": {"type": "string", "pattern": "^https://"},
+            "tls": {
+              "type": "object",
+              "required": ["enabled", "serverName", "caSecretKey"],
+              "properties": {
+                "enabled": {"const": true},
+                "serverName": {"type": "string", "minLength": 1},
+                "caSecretKey": {"type": "string", "minLength": 1}
+              }
+            },
+            "sasl": {
+              "type": "object",
+              "required": ["mechanism"],
+              "properties": {
+                "mechanism": {"enum": ["scram-sha-256", "scram-sha-512"]}
+              }
+            }
+          }
+        },
+        "otel": {
+          "type": "object",
+          "required": ["endpoint"]
+        },
+        "keycloak": {
+          "type": "object",
+          "required": ["endpoint", "realm", "clientId", "issuer", "audience", "jwksUrl"],
+          "properties": {
+            "endpoint": {"type": "string", "pattern": "^https://"},
+            "issuer": {"type": "string", "pattern": "^https://"},
+            "audience": {"type": "string", "minLength": 1},
+            "jwksUrl": {"type": "string", "pattern": "^https://"}
+          }
+        },
+        "temporal": {
+          "type": "object",
+          "required": ["address", "namespace", "taskQueue"]
+        },
+        "callback": {
+          "type": "object",
+          "required": ["signingKeyVersion", "verifiedDomains"],
+          "properties": {
+            "signingKeyVersion": {"type": "string", "minLength": 1},
+            "verifiedDomains": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "required": ["enabled", "image", "activeDeadlineSeconds"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "activeDeadlineSeconds": {"type": "integer", "minimum": 60, "maximum": 3600},
+        "image": {
+          "type": "object",
+          "required": ["repository", "digest"],
+          "properties": {
+            "repository": {"type": "string", "minLength": 1},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        }
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["enabled", "replicas", "image", "databaseSecretPrefix", "kafkaSecretPrefix"],
+        "properties": {
+          "enabled": {"type": "boolean"},
+          "replicas": {"type": "integer", "minimum": 2},
+          "image": {
+            "type": "object",
+            "required": ["repository", "digest"],
+            "properties": {
+              "repository": {"type": "string", "minLength": 1},
+              "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+            }
+          },
+          "databaseSecretPrefix": {"type": "string", "minLength": 1},
+          "kafkaSecretPrefix": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

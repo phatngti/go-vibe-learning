@@ -11,10 +11,13 @@ type ReferralRow struct {
 func (ReferralRow) TableName() string { return "public.referrals" }
 
 type AgentMetricRow struct {
-	AgentID           string    `gorm:"type:text;primaryKey"`
-	AccumulatedVolume float64   `gorm:"type:numeric(15,2);not null;default:0"`
-	ReferralCount     int32     `gorm:"type:integer;not null;default:0"`
-	UpdatedAt         time.Time `gorm:"not null;default:now()"`
+	AgentID                string    `gorm:"type:text;primaryKey"`
+	AccumulatedVolume      float64   `gorm:"type:numeric(15,2);not null;default:0"`
+	AccumulatedVolumeMinor *int64    `gorm:"type:bigint"`
+	Currency               *string   `gorm:"type:text"`
+	CurrencyExponent       *int32    `gorm:"type:smallint"`
+	ReferralCount          int32     `gorm:"type:integer;not null;default:0"`
+	UpdatedAt              time.Time `gorm:"not null;default:now()"`
 }
 
 func (AgentMetricRow) TableName() string { return "public.agent_metrics" }

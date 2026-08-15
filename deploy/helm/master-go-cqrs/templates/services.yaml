@@ -1,0 +1,24 @@
+{{- range $name, $service := .Values.services }}
+{{- if and $service.enabled (or (gt (int $service.httpPort) 0) (gt (int $service.grpcPort) 0)) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "master-go-cqrs.serviceName" (dict "root" $ "name" $name) }}
+  labels:
+    {{- include "master-go-cqrs.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+  ports:
+    {{- if gt (int $service.httpPort) 0 }}
+    - {name: http, port: {{ $service.httpPort }}, targetPort: http}
+    {{- end }}
+    {{- if gt (int $service.grpcPort) 0 }}
+    - {name: grpc, port: {{ $service.grpcPort }}, targetPort: grpc}
+    {{- end }}
+{{- end }}
+{{- end }}
+

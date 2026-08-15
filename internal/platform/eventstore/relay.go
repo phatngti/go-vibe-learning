@@ -5,8 +5,8 @@ package eventstore
 
 import (
 	"context"
-	"fmt"
 
+	"github/master_go_cqrs/internal/platform/messageidentity"
 	"github/master_go_cqrs/internal/platform/outbox"
 
 	"gorm.io/gorm"
@@ -18,7 +18,8 @@ type RelayMapping struct {
 	Topic string
 	// MessageType is the outbox message type, e.g. messagebus.PaymentCompletedType.
 	MessageType string
-	// StepName is used to generate a deterministic MessageID: "{AggregateID}:{StepName}".
+	// StepName is used with the immutable aggregate version to generate a
+	// deterministic fact identity: "{AggregateID}:{StepName}:v{Version}".
 	StepName string
 }
 
@@ -53,7 +54,7 @@ func (r *relayRepository) AppendEvent(ctx context.Context, db *gorm.DB, event *D
 		return nil // No relay mapping for this event type; append-only.
 	}
 
-	messageID := fmt.Sprintf("%s:%s", event.AggregateID, mapping.StepName)
+	messageID := messageidentity.Fact(event.AggregateID, mapping.StepName, event.Version)
 	return r.outbox.Enqueue(ctx, db, outbox.EnqueueParams{
 		MessageID:     messageID,
 		Topic:         mapping.Topic,

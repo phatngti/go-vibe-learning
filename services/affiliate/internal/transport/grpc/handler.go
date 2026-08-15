@@ -4,6 +4,7 @@ import (
 	"context"
 
 	affiliatev1 "github/master_go_cqrs/contracts/genproto/affiliate"
+	"github/master_go_cqrs/internal/platform/security/gatewayauth"
 	"github/master_go_cqrs/services/affiliate/internal/application/command"
 	"github/master_go_cqrs/services/affiliate/internal/application/dto"
 	"github/master_go_cqrs/services/affiliate/internal/application/query"
@@ -33,7 +34,11 @@ func NewServerHandler(grpcServer *grpc.Server, registerReferral *command.Registe
 func RequireServerHandler(*ServerHandler) {}
 
 func (h *ServerHandler) RegisterReferral(ctx context.Context, req *affiliatev1.RegisterReferralRequest) (*affiliatev1.RegisterReferralResponse, error) {
-	err := h.registerReferral.Handle(ctx, &dto.RegisterReferral{ReferrerID: req.ReferrerId, RefereeID: req.RefereeId})
+	owner, err := gatewayauth.RequireAgentOwnership(ctx, req.ReferrerId)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	err = h.registerReferral.Handle(ctx, &dto.RegisterReferral{ReferrerID: owner.AgentID, RefereeID: req.RefereeId})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to register referral: %v", err)
 	}
@@ -45,7 +50,11 @@ func (h *ServerHandler) RegisterReferral(ctx context.Context, req *affiliatev1.R
 }
 
 func (h *ServerHandler) GetAgentRank(ctx context.Context, req *affiliatev1.GetAgentRankRequest) (*affiliatev1.GetAgentRankResponse, error) {
-	level, metrics, err := h.getRank.Handle(ctx, req.AgentId)
+	owner, err := gatewayauth.RequireAgentOwnership(ctx, req.AgentId)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	level, metrics, err := h.getRank.Handle(ctx, owner.AgentID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "agent not found: %v", err)
 	}
@@ -73,13 +82,17 @@ func (h *ServerHandler) GetAgentRank(ctx context.Context, req *affiliatev1.GetAg
 }
 
 func (h *ServerHandler) GetDownline(ctx context.Context, req *affiliatev1.GetDownlineRequest) (*affiliatev1.GetDownlineResponse, error) {
-	referees, err := h.getDownline.Handle(ctx, req.AgentId)
+	owner, err := gatewayauth.RequireAgentOwnership(ctx, req.AgentId)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	referees, err := h.getDownline.Handle(ctx, owner.AgentID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query downline: %v", err)
 	}
 
 	return &affiliatev1.GetDownlineResponse{
-		AgentId:        req.AgentId,
+		AgentId:        owner.AgentID,
 		RefereeIds:     referees,
 		TotalReferrals: int32(len(referees)),
 	}, nil

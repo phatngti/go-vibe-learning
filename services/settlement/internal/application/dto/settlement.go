@@ -1,12 +1,16 @@
 package dto
 
+import sharedmoney "github/master_go_cqrs/internal/shared/money"
+
 var MessageCode = map[string]string{}
 
 type CalculateAndCreditCommission struct {
-	AgentID           string  `json:"agent_id" example:"agent-123"`
-	TransactionAmount float64 `json:"transaction_amount" example:"1000"`
-	Rank              string  `json:"rank" example:"BRONZE"`
-	TransactionID     string  `json:"transaction_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AgentID           string             `json:"agent_id" example:"agent-123"`
+	TransactionMoney  *sharedmoney.Money `json:"transaction_money,omitempty"`
+	TransactionAmount float64            `json:"transaction_amount" example:"1000"`
+	Currency          string             `json:"currency,omitempty" example:"USD"`
+	Rank              string             `json:"rank" example:"BRONZE"`
+	TransactionID     string             `json:"transaction_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
 type RequestWithdrawal struct {

@@ -1,0 +1,7 @@
+version: v2
+modules:
+  - path: contracts/proto
+  - path: third_party
+breaking:
+  use:
+    - FILE

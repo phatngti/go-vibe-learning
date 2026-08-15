@@ -13,22 +13,12 @@ import (
 )
 
 type gatewayStub struct {
-	started []payment.Event
-	signals []gatewaySignal
-	err     error
+	delivered []payment.Event
+	err       error
 }
 
-type gatewaySignal struct {
-	event payment.Event
-}
-
-func (g *gatewayStub) StartPayment(_ context.Context, event payment.Event) error {
-	g.started = append(g.started, event)
-	return g.err
-}
-
-func (g *gatewayStub) SignalPayment(_ context.Context, event payment.Event) error {
-	g.signals = append(g.signals, gatewaySignal{event: event})
+func (g *gatewayStub) DeliverPayment(_ context.Context, event payment.Event) error {
+	g.delivered = append(g.delivered, event)
 	return g.err
 }
 
@@ -41,8 +31,11 @@ func TestBridgeStartsAndSignalsPaymentWorkflow(t *testing.T) {
 	})); err != nil {
 		t.Fatal(err)
 	}
-	if len(gateway.started) != 1 || gateway.started[0].TransactionID != "tx-1" {
-		t.Fatalf("started = %+v", gateway.started)
+	if len(gateway.delivered) != 1 || gateway.delivered[0].TransactionID != "tx-1" {
+		t.Fatalf("delivered = %+v", gateway.delivered)
+	}
+	if gateway.delivered[0].OrchestrationOwner != "temporal:v1" || gateway.delivered[0].OrchestrationGeneration != 1 {
+		t.Fatalf("orchestration identity = %q generation %d", gateway.delivered[0].OrchestrationOwner, gateway.delivered[0].OrchestrationGeneration)
 	}
 
 	events := []struct {
@@ -58,7 +51,7 @@ func TestBridgeStartsAndSignalsPaymentWorkflow(t *testing.T) {
 		if err := bridge.Handle(context.Background(), bridgeMessage(event.typeName, event.typeName, event.payload)); err != nil {
 			t.Fatalf("Handle(%s) error = %v", event.typeName, err)
 		}
-		if got := gateway.signals[len(gateway.signals)-1]; got.event.TransactionID != "tx-1" || got.event.Kind != event.kind {
+		if got := gateway.delivered[len(gateway.delivered)-1]; got.TransactionID != "tx-1" || got.Kind != event.kind {
 			t.Fatalf("signal = %+v", got)
 		}
 	}

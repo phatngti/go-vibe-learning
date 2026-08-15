@@ -16,7 +16,7 @@ server:
 keycloak:
   endpoint: "http://keycloak.master-go-cqrs.svc.cluster.local:8080"
   clientId: "master-go-cqrs"
-  clientSecret: "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
+  clientSecret: "local-dev-client-secret-change-me"
   customHeaderName: "Authorization"
   realm: "backend"
 
@@ -35,3 +35,22 @@ kafka:
     settlementEvents: "settlement.events"
     agentCommands: "agent.commands"
     agentEvents: "agent.events"
+
+# Development defaults. Production validation forces HTTPS, requires a
+# verified-domain allowlist, and requires the signing key through secret-backed
+# environment variables.
+callback:
+  requireHttps: false
+  requireVerified: false
+  verifiedDomains: []
+  signingKeyVersion: "local-v1"
+  signingSecret: ""
+  requestTimeout: 10s
+  dialTimeout: 3s
+  tlsHandshakeTimeout: 5s
+  responseHeaderTimeout: 5s
+  challengeTtl: 24h
+  workerEnabled: true
+  workerParallelism: 4
+  workerPollInterval: 1s
+  workerLeaseDuration: 30s

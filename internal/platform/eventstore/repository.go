@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	platformpostgres "github/master_go_cqrs/internal/platform/postgres"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -41,7 +43,7 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *gormRepository) AppendEvent(ctx context.Context, db *gorm.DB, event *DomainEvent) error {
-	activeDB := r.db
+	activeDB := platformpostgres.FromContext(ctx, r.db)
 	if db != nil {
 		activeDB = db
 	}
@@ -77,7 +79,7 @@ func (r *gormRepository) LoadEventsFrom(ctx context.Context, aggregateType, aggr
 }
 
 func (r *gormRepository) NextVersion(ctx context.Context, db *gorm.DB, aggregateType, aggregateID string) (int64, error) {
-	activeDB := r.db
+	activeDB := platformpostgres.FromContext(ctx, r.db)
 	if db != nil {
 		activeDB = db
 	}

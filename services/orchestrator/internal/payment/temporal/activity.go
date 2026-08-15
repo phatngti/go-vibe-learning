@@ -6,6 +6,8 @@ import (
 	"github/master_go_cqrs/internal/platform/kafka"
 	"github/master_go_cqrs/services/orchestrator/internal/payment"
 	"github/master_go_cqrs/services/orchestrator/internal/payment/codec"
+
+	temporalsdk "go.temporal.io/sdk/temporal"
 )
 
 type CommandActivity struct {
@@ -20,7 +22,7 @@ func NewCommandActivity(producer kafka.Producer, kafkaCodec *codec.Kafka) *Comma
 func (a *CommandActivity) Publish(ctx context.Context, command payment.Command) error {
 	encoded, err := a.codec.Encode(command)
 	if err != nil {
-		return err
+		return temporalsdk.NewNonRetryableApplicationError("encode payment saga command", "InvalidCommand", err)
 	}
 	return a.producer.Publish(ctx, encoded.Topic, encoded.Key, encoded.Message)
 }

@@ -20,6 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	AgentConfigService_ConfigureCallback_FullMethodName = "/agent.v1.AgentConfigService/ConfigureCallback"
+	AgentConfigService_VerifyCallback_FullMethodName    = "/agent.v1.AgentConfigService/VerifyCallback"
+	AgentConfigService_ReplayCallback_FullMethodName    = "/agent.v1.AgentConfigService/ReplayCallback"
 	AgentConfigService_GenerateApiKey_FullMethodName    = "/agent.v1.AgentConfigService/GenerateApiKey"
 	AgentConfigService_ValidateApiKey_FullMethodName    = "/agent.v1.AgentConfigService/ValidateApiKey"
 	AgentConfigService_RecordAuditLog_FullMethodName    = "/agent.v1.AgentConfigService/RecordAuditLog"
@@ -30,6 +32,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentConfigServiceClient interface {
 	ConfigureCallback(ctx context.Context, in *ConfigureCallbackRequest, opts ...grpc.CallOption) (*ConfigureCallbackResponse, error)
+	VerifyCallback(ctx context.Context, in *VerifyCallbackRequest, opts ...grpc.CallOption) (*VerifyCallbackResponse, error)
+	ReplayCallback(ctx context.Context, in *ReplayCallbackRequest, opts ...grpc.CallOption) (*ReplayCallbackResponse, error)
 	GenerateApiKey(ctx context.Context, in *GenerateApiKeyRequest, opts ...grpc.CallOption) (*GenerateApiKeyResponse, error)
 	ValidateApiKey(ctx context.Context, in *ValidateApiKeyRequest, opts ...grpc.CallOption) (*ValidateApiKeyResponse, error)
 	RecordAuditLog(ctx context.Context, in *RecordAuditLogRequest, opts ...grpc.CallOption) (*RecordAuditLogResponse, error)
@@ -47,6 +51,26 @@ func (c *agentConfigServiceClient) ConfigureCallback(ctx context.Context, in *Co
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConfigureCallbackResponse)
 	err := c.cc.Invoke(ctx, AgentConfigService_ConfigureCallback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentConfigServiceClient) VerifyCallback(ctx context.Context, in *VerifyCallbackRequest, opts ...grpc.CallOption) (*VerifyCallbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyCallbackResponse)
+	err := c.cc.Invoke(ctx, AgentConfigService_VerifyCallback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentConfigServiceClient) ReplayCallback(ctx context.Context, in *ReplayCallbackRequest, opts ...grpc.CallOption) (*ReplayCallbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplayCallbackResponse)
+	err := c.cc.Invoke(ctx, AgentConfigService_ReplayCallback_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +112,8 @@ func (c *agentConfigServiceClient) RecordAuditLog(ctx context.Context, in *Recor
 // for forward compatibility.
 type AgentConfigServiceServer interface {
 	ConfigureCallback(context.Context, *ConfigureCallbackRequest) (*ConfigureCallbackResponse, error)
+	VerifyCallback(context.Context, *VerifyCallbackRequest) (*VerifyCallbackResponse, error)
+	ReplayCallback(context.Context, *ReplayCallbackRequest) (*ReplayCallbackResponse, error)
 	GenerateApiKey(context.Context, *GenerateApiKeyRequest) (*GenerateApiKeyResponse, error)
 	ValidateApiKey(context.Context, *ValidateApiKeyRequest) (*ValidateApiKeyResponse, error)
 	RecordAuditLog(context.Context, *RecordAuditLogRequest) (*RecordAuditLogResponse, error)
@@ -103,6 +129,12 @@ type UnimplementedAgentConfigServiceServer struct{}
 
 func (UnimplementedAgentConfigServiceServer) ConfigureCallback(context.Context, *ConfigureCallbackRequest) (*ConfigureCallbackResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConfigureCallback not implemented")
+}
+func (UnimplementedAgentConfigServiceServer) VerifyCallback(context.Context, *VerifyCallbackRequest) (*VerifyCallbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyCallback not implemented")
+}
+func (UnimplementedAgentConfigServiceServer) ReplayCallback(context.Context, *ReplayCallbackRequest) (*ReplayCallbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReplayCallback not implemented")
 }
 func (UnimplementedAgentConfigServiceServer) GenerateApiKey(context.Context, *GenerateApiKeyRequest) (*GenerateApiKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateApiKey not implemented")
@@ -148,6 +180,42 @@ func _AgentConfigService_ConfigureCallback_Handler(srv interface{}, ctx context.
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AgentConfigServiceServer).ConfigureCallback(ctx, req.(*ConfigureCallbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentConfigService_VerifyCallback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyCallbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentConfigServiceServer).VerifyCallback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentConfigService_VerifyCallback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentConfigServiceServer).VerifyCallback(ctx, req.(*VerifyCallbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentConfigService_ReplayCallback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplayCallbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentConfigServiceServer).ReplayCallback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentConfigService_ReplayCallback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentConfigServiceServer).ReplayCallback(ctx, req.(*ReplayCallbackRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -216,6 +284,14 @@ var AgentConfigService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConfigureCallback",
 			Handler:    _AgentConfigService_ConfigureCallback_Handler,
+		},
+		{
+			MethodName: "VerifyCallback",
+			Handler:    _AgentConfigService_VerifyCallback_Handler,
+		},
+		{
+			MethodName: "ReplayCallback",
+			Handler:    _AgentConfigService_ReplayCallback_Handler,
 		},
 		{
 			MethodName: "GenerateApiKey",

@@ -16,7 +16,7 @@ server:
 keycloak:
   endpoint: "http://keycloak.master-go-cqrs.svc.cluster.local:8080"
   clientId: "master-go-cqrs"
-  clientSecret: "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
+  clientSecret: "local-dev-client-secret-change-me"
   customHeaderName: "Authorization"
   realm: "backend"
 
@@ -27,7 +27,10 @@ otel:
 kafka:
   brokers:
     - "kafka.master-go-cqrs.svc.cluster.local:9092"
+  consumerMaxAttempts: 8
+  retryMaxDelay: 30s
   topics:
+    paymentInitiatedEvents: "payments.initiated"
     paymentEvents: "payments.events"
     affiliateCommands: "affiliate.commands"
     affiliateEvents: "affiliate.events"
@@ -36,9 +39,23 @@ kafka:
     agentCommands: "agent.commands"
     agentEvents: "agent.events"
 
+outbox:
+  enabled: true
+  pollInterval: 100ms
+  batchSize: 500
+  parallelism: 16
+  staleAfter: 2m
+  maxAttempts: 20
+
 orchestrator:
   engine: "saga"
+  owner: "saga:v1"
+  generation: 1
   temporal:
     address: "temporal.master-go-cqrs.svc.cluster.local:7233"
     namespace: "master-go-cqrs"
     taskQueue: "payment-orchestration"
+    tlsEnabled: false
+    versioningEnabled: false
+    deploymentName: "payment-orchestrator"
+    buildId: "local"

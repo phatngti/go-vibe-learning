@@ -18,6 +18,7 @@ type workflowClientStub struct {
 	startOptions client.StartWorkflowOptions
 	workflow     interface{}
 	startErr     error
+	deliveryErr  error
 	signalErr    error
 	status       enumspb.WorkflowExecutionStatus
 }
@@ -30,6 +31,12 @@ func (c *workflowClientStub) ExecuteWorkflow(_ context.Context, options client.S
 
 func (c *workflowClientStub) SignalWorkflow(context.Context, string, string, string, interface{}) error {
 	return c.signalErr
+}
+
+func (c *workflowClientStub) SignalWithStartWorkflow(_ context.Context, _ string, _ string, _ interface{}, options client.StartWorkflowOptions, workflow interface{}, _ ...interface{}) (client.WorkflowRun, error) {
+	c.startOptions = options
+	c.workflow = workflow
+	return nil, c.deliveryErr
 }
 
 func (c *workflowClientStub) DescribeWorkflowExecution(context.Context, string, string) (*workflowservice.DescribeWorkflowExecutionResponse, error) {
@@ -56,11 +63,22 @@ func TestGatewayUsesDeterministicWorkflowIdentity(t *testing.T) {
 	}
 }
 
-func TestGatewayAcceptsSignalRedeliveryAfterWorkflowClosed(t *testing.T) {
+func TestGatewayClassifiesSignalAfterWorkflowClosed(t *testing.T) {
 	stub := &workflowClientStub{signalErr: errors.New("workflow already completed"), status: enumspb.WORKFLOW_EXECUTION_STATUS_COMPLETED}
 	gateway := &Gateway{client: stub, taskQueue: "payment-orchestration"}
-	if err := gateway.SignalPayment(context.Background(), payment.Event{Kind: payment.EventVolumeAccumulated, TransactionID: "tx-1"}); err != nil {
-		t.Fatalf("SignalPayment() error = %v", err)
+	if err := gateway.SignalPayment(context.Background(), payment.Event{Kind: payment.EventVolumeAccumulated, TransactionID: "tx-1"}); !errors.Is(err, ErrWorkflowClosed) {
+		t.Fatalf("SignalPayment() error = %v, want ErrWorkflowClosed", err)
+	}
+}
+
+func TestGatewayAtomicallySignalsOrStarts(t *testing.T) {
+	stub := &workflowClientStub{}
+	gateway := &Gateway{client: stub, taskQueue: "payment-orchestration"}
+	if err := gateway.DeliverPayment(context.Background(), payment.Event{Kind: payment.EventPaymentCompleted, TransactionID: "tx-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if stub.startOptions.ID != "payment:tx-1" || stub.startOptions.WorkflowIDConflictPolicy != enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING {
+		t.Fatalf("delivery options = %+v", stub.startOptions)
 	}
 }
 

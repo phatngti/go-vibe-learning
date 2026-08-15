@@ -23,14 +23,15 @@ const (
 )
 
 type InitiatePaymentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	Amount        float64                `protobuf:"fixed64,2,opt,name=amount,proto3" json:"amount,omitempty"`
-	Currency      string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
-	CustomerId    string                 `protobuf:"bytes,4,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
-	CallbackUrl   string                 `protobuf:"bytes,5,opt,name=callback_url,json=callbackUrl,proto3" json:"callback_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AgentId        string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Amount         float64                `protobuf:"fixed64,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Currency       string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
+	CustomerId     string                 `protobuf:"bytes,4,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	CallbackUrl    string                 `protobuf:"bytes,5,opt,name=callback_url,json=callbackUrl,proto3" json:"callback_url,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InitiatePaymentRequest) Reset() {
@@ -98,6 +99,13 @@ func (x *InitiatePaymentRequest) GetCallbackUrl() string {
 	return ""
 }
 
+func (x *InitiatePaymentRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
 type InitiatePaymentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TransactionId string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
@@ -159,13 +167,14 @@ func (x *InitiatePaymentResponse) GetStatus() string {
 }
 
 type ProcessPaymentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TransactionId string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
-	PaymentMethod string                 `protobuf:"bytes,2,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"`
-	CardNumber    string                 `protobuf:"bytes,3,opt,name=card_number,json=cardNumber,proto3" json:"card_number,omitempty"`
-	Cvv           string                 `protobuf:"bytes,4,opt,name=cvv,proto3" json:"cvv,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TransactionId  string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
+	PaymentMethod  string                 `protobuf:"bytes,2,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"`
+	CardNumber     string                 `protobuf:"bytes,3,opt,name=card_number,json=cardNumber,proto3" json:"card_number,omitempty"`
+	Cvv            string                 `protobuf:"bytes,4,opt,name=cvv,proto3" json:"cvv,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ProcessPaymentRequest) Reset() {
@@ -222,6 +231,13 @@ func (x *ProcessPaymentRequest) GetCardNumber() string {
 func (x *ProcessPaymentRequest) GetCvv() string {
 	if x != nil {
 		return x.Cvv
+	}
+	return ""
+}
+
+func (x *ProcessPaymentRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
 	}
 	return ""
 }
@@ -419,25 +435,27 @@ var File_proto_payment_proto protoreflect.FileDescriptor
 const file_proto_payment_proto_rawDesc = "" +
 	"\n" +
 	"\x13proto/payment.proto\x12\n" +
-	"payment.v1\x1a\x1cgoogle/api/annotations.proto\"\xab\x01\n" +
+	"payment.v1\x1a\x1cgoogle/api/annotations.proto\"\xd4\x01\n" +
 	"\x16InitiatePaymentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12\x1a\n" +
 	"\bcurrency\x18\x03 \x01(\tR\bcurrency\x12\x1f\n" +
 	"\vcustomer_id\x18\x04 \x01(\tR\n" +
 	"customerId\x12!\n" +
-	"\fcallback_url\x18\x05 \x01(\tR\vcallbackUrl\"y\n" +
+	"\fcallback_url\x18\x05 \x01(\tR\vcallbackUrl\x12'\n" +
+	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"y\n" +
 	"\x17InitiatePaymentResponse\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x1f\n" +
 	"\vpayment_url\x18\x02 \x01(\tR\n" +
 	"paymentUrl\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\"\x98\x01\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\"\xc1\x01\n" +
 	"\x15ProcessPaymentRequest\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12%\n" +
 	"\x0epayment_method\x18\x02 \x01(\tR\rpaymentMethod\x12\x1f\n" +
 	"\vcard_number\x18\x03 \x01(\tR\n" +
 	"cardNumber\x12\x10\n" +
-	"\x03cvv\x18\x04 \x01(\tR\x03cvv\"q\n" +
+	"\x03cvv\x18\x04 \x01(\tR\x03cvv\x12'\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"q\n" +
 	"\x16ProcessPaymentResponse\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +

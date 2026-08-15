@@ -16,10 +16,23 @@ server:
 keycloak:
   endpoint: "http://keycloak.master-go-cqrs.svc.cluster.local:8080"
   clientId: "master-go-cqrs"
-  clientSecret: "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
+  clientSecret: "local-dev-client-secret-change-me"
   customHeaderName: "Authorization"
   realm: "backend"
 
 otel:
   endpoint: "otel.master-go-cqrs.svc.cluster.local:4318"
   service: "user"
+
+# Durable Keycloak synchronization. Provider I/O is bounded by providerTimeout
+# and always runs outside database/checkpoint transactions.
+syncJobs:
+  enabled: true
+  pageSize: 100
+  parallelism: 4
+  pollInterval: 250ms
+  leaseDuration: 1m
+  providerTimeout: 15s
+  maxAttempts: 12
+  retryBaseDelay: 1s
+  retryMaxDelay: 5m

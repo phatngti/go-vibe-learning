@@ -56,7 +56,7 @@ func (p *Process) ProcessEvent(ctx context.Context, tx *gorm.DB, message *kafka.
 		model = &paymentsaga.Model{}
 	}
 	paymentsaga.ApplySnapshot(model, transition.Snapshot)
-	if transition.Command != nil {
+	if !transition.Terminal && transition.Snapshot.State != payment.StateNeedsManualReview {
 		model.RetryCount = 1
 		next := time.Now().Add(p.definition.Policy().StepTimeout)
 		model.NextRetryAt = &next
@@ -67,7 +67,7 @@ func (p *Process) ProcessEvent(ctx context.Context, tx *gorm.DB, message *kafka.
 	if err := p.repo.Save(ctx, tx, model); err != nil {
 		return err
 	}
-	return p.enqueue(ctx, tx, transition.Command)
+	return p.enqueue(ctx, tx, transition.Command, message)
 }
 
 func (p *Process) Due(ctx context.Context, limit int) ([]string, error) {
@@ -85,7 +85,7 @@ func (p *Process) Retry(ctx context.Context, transactionID string, now time.Time
 			return err
 		}
 		paymentsaga.ApplySnapshot(model, transition.Snapshot)
-		if transition.Command == nil {
+		if transition.Terminal || transition.Snapshot.State == payment.StateNeedsManualReview {
 			model.RetryCount = 0
 			model.NextRetryAt = nil
 		} else {
@@ -96,11 +96,11 @@ func (p *Process) Retry(ctx context.Context, transactionID string, now time.Time
 		if err := p.repo.Save(ctx, tx, model); err != nil {
 			return err
 		}
-		return p.enqueue(ctx, tx, transition.Command)
+		return p.enqueue(ctx, tx, transition.Command, nil)
 	})
 }
 
-func (p *Process) enqueue(ctx context.Context, tx *gorm.DB, command *payment.Command) error {
+func (p *Process) enqueue(ctx context.Context, tx *gorm.DB, command *payment.Command, cause *kafka.Message) error {
 	if command == nil {
 		return nil
 	}
@@ -108,10 +108,24 @@ func (p *Process) enqueue(ctx context.Context, tx *gorm.DB, command *payment.Com
 	if err != nil {
 		return err
 	}
+	if cause != nil {
+		if cause.CorrelationID != "" {
+			encoded.Message.CorrelationID = cause.CorrelationID
+		}
+		encoded.Message.CausationID = cause.ID
+		encoded.Message.TenantID = cause.TenantID
+		encoded.Message.TraceParent = cause.TraceParent
+		encoded.Message.TraceState = cause.TraceState
+	}
+	kafka.PrepareMessage(ctx, encoded.Message)
 	return p.outbox.Enqueue(ctx, tx, outbox.EnqueueParams{
 		MessageID: encoded.Message.ID, Topic: encoded.Topic, MessageKey: encoded.Key,
 		MessageType: encoded.Message.EventType, AggregateType: encoded.Message.AggregateType,
 		AggregateID: encoded.Message.AggregateID, Payload: encoded.Message.Payload,
+		SchemaVersion: encoded.Message.SchemaVersion, AggregateVersion: encoded.Message.AggregateVersion,
+		TenantID: encoded.Message.TenantID, CorrelationID: encoded.Message.CorrelationID, CausationID: encoded.Message.CausationID,
+		OrchestrationOwner: encoded.Message.OrchestrationOwner, OrchestrationGeneration: encoded.Message.OrchestrationGeneration,
+		TraceParent: encoded.Message.TraceParent, TraceState: encoded.Message.TraceState,
 	})
 }
 

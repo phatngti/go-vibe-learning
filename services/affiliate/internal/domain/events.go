@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	sharedmoney "github/master_go_cqrs/internal/shared/money"
+)
 
 // ReferralRegistered is raised when a new agent-to-agent referral is recorded.
 type ReferralRegistered struct {
@@ -13,13 +17,15 @@ func (ReferralRegistered) EventType() string { return "ReferralRegistered" }
 
 // VolumeAccumulated is raised when a payment transaction contributes to an agent's affiliate volume.
 type VolumeAccumulated struct {
-	TransactionID string    `json:"transaction_id"`
-	AgentID       string    `json:"agent_id"`
-	Amount        float64   `json:"amount"`
-	TotalVolume   float64   `json:"total_volume"`
-	CurrentRank   Rank      `json:"current_rank"`
-	RankPromoted  bool      `json:"rank_promoted"`
-	OccurredAt    time.Time `json:"occurred_at"`
+	TransactionID string             `json:"transaction_id"`
+	AgentID       string             `json:"agent_id"`
+	Money         *sharedmoney.Money `json:"money,omitempty"`
+	TotalMoney    *sharedmoney.Money `json:"total_money,omitempty"`
+	Amount        float64            `json:"amount"`
+	TotalVolume   float64            `json:"total_volume"`
+	CurrentRank   Rank               `json:"current_rank"`
+	RankPromoted  bool               `json:"rank_promoted"`
+	OccurredAt    time.Time          `json:"occurred_at"`
 }
 
 func (VolumeAccumulated) EventType() string { return "VolumeAccumulated" }

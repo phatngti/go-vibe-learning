@@ -12,6 +12,7 @@ message InitiatePaymentRequest {
   string currency = 3;
   string customer_id = 4;
   string callback_url = 5;
+  string idempotency_key = 6;
 }
 
 message InitiatePaymentResponse {
@@ -25,6 +26,7 @@ message ProcessPaymentRequest {
   string payment_method = 2;
   string card_number = 3;
   string cvv = 4;
+  string idempotency_key = 5;
 }
 
 message ProcessPaymentResponse {

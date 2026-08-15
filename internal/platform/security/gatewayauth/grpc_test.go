@@ -25,6 +25,29 @@ func TestUnaryServerInterceptorProtectsConfiguredMethod(t *testing.T) {
 	}
 }
 
+func TestUnaryServerInterceptorProtectsPaymentV2Methods(t *testing.T) {
+	payload := testPayload(t)
+	interceptor := UnaryServerInterceptor()
+
+	for _, method := range []string{
+		"/payment.v2.PaymentService/CreatePayment",
+		"/payment.v2.PaymentService/GetPayment",
+	} {
+		t.Run(method, func(t *testing.T) {
+			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(PayloadHeader, payload))
+			_, err := interceptor(ctx, "request", &grpc.UnaryServerInfo{FullMethod: method}, func(ctx context.Context, req any) (any, error) {
+				if _, ok := FromContext(ctx); !ok {
+					t.Fatal("verified gateway principal is missing from context")
+				}
+				return "ok", nil
+			})
+			if err != nil {
+				t.Fatalf("interceptor error = %v", err)
+			}
+		})
+	}
+}
+
 func TestUnaryServerInterceptorLeavesInternalMethodUnblocked(t *testing.T) {
 	interceptor := UnaryServerInterceptor()
 

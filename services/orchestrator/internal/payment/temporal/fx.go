@@ -25,6 +25,7 @@ var Module = fx.Module("orchestrator-temporal",
 		NewCommandActivity,
 		NewBridge,
 	),
+	kafka.AsSubscription(NewPaymentInitiatedSubscription),
 	kafka.AsSubscription(NewPaymentSubscription),
 	kafka.AsSubscription(NewAffiliateSubscription),
 	kafka.AsSubscription(NewSettlementSubscription),
@@ -33,7 +34,19 @@ var Module = fx.Module("orchestrator-temporal",
 )
 
 func RegisterWorker(lifecycle fx.Lifecycle, c client.Client, commands *CommandActivity, cfg *config.Config, l logger.Factory) {
-	w := worker.New(c, cfg.Orchestrator.Temporal.TaskQueue, worker.Options{})
+	settings := cfg.Orchestrator.Temporal
+	workerOptions := worker.Options{}
+	if settings.VersioningEnabled {
+		workerOptions.DeploymentOptions = worker.DeploymentOptions{
+			UseVersioning: true,
+			Version: worker.WorkerDeploymentVersion{
+				DeploymentName: settings.DeploymentName,
+				BuildID:        settings.BuildID,
+			},
+			DefaultVersioningBehavior: workflow.VersioningBehaviorPinned,
+		}
+	}
+	w := worker.New(c, settings.TaskQueue, workerOptions)
 	w.RegisterWorkflowWithOptions(PaymentWorkflow, workflow.RegisterOptions{Name: PaymentWorkflowName})
 	w.RegisterActivityWithOptions(commands.Publish, activity.RegisterOptions{Name: PublishCommandActivityName})
 	lifecycle.Append(fx.Hook{

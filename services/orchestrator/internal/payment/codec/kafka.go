@@ -18,11 +18,14 @@ type EncodedCommand struct {
 }
 
 type Kafka struct {
-	topics config.KafkaTopics
+	topics                  config.KafkaTopics
+	orchestrationOwner      string
+	orchestrationGeneration int64
 }
 
 func NewKafka(cfg *config.Config) *Kafka {
-	return &Kafka{topics: cfg.Kafka.Topics}
+	owner, generation := cfg.OrchestrationIdentity()
+	return &Kafka{topics: cfg.Kafka.Topics, orchestrationOwner: owner, orchestrationGeneration: generation}
 }
 
 func (c *Kafka) Decode(message *platformkafka.Message) (payment.Event, error) {
@@ -33,18 +36,52 @@ func (c *Kafka) Decode(message *platformkafka.Message) (payment.Event, error) {
 		if err := decode(message, &payload); err != nil {
 			return event, err
 		}
+		monetaryAmount, err := messagebus.ResolveMoney(payload.Money, payload.Amount, payload.Currency)
+		if err != nil {
+			return event, processcore.Invalid("decode %s money: %v", message.EventType, err)
+		}
 		event = payment.Event{
 			Kind: payment.EventPaymentInitiated, TransactionID: payload.TransactionID,
-			AgentID: payload.AgentID, Amount: payload.Amount, Currency: payload.Currency,
+			AgentID: payload.AgentID, Money: messagebus.MoneyPointer(monetaryAmount), Amount: payload.Amount, Currency: monetaryAmount.Currency,
 		}
 	case messagebus.PaymentCompletedType:
 		var payload messagebus.PaymentCompleted
 		if err := decode(message, &payload); err != nil {
 			return event, err
 		}
+		monetaryAmount, err := messagebus.ResolveMoney(payload.Money, payload.Amount, payload.Currency)
+		if err != nil {
+			return event, processcore.Invalid("decode %s money: %v", message.EventType, err)
+		}
 		event = payment.Event{
 			Kind: payment.EventPaymentCompleted, TransactionID: payload.TransactionID,
-			AgentID: payload.AgentID, Amount: payload.Amount, Currency: payload.Currency,
+			AgentID: payload.AgentID, Money: messagebus.MoneyPointer(monetaryAmount), Amount: payload.Amount, Currency: monetaryAmount.Currency,
+		}
+	case messagebus.PaymentFailedType:
+		var payload messagebus.PaymentFailed
+		if err := decode(message, &payload); err != nil {
+			return event, err
+		}
+		monetaryAmount, err := messagebus.ResolveMoney(payload.Money, payload.Amount, payload.Currency)
+		if err != nil {
+			return event, processcore.Invalid("decode %s money: %v", message.EventType, err)
+		}
+		event = payment.Event{
+			Kind: payment.EventPaymentFailed, TransactionID: payload.TransactionID,
+			AgentID: payload.AgentID, Money: messagebus.MoneyPointer(monetaryAmount), Amount: payload.Amount, Currency: monetaryAmount.Currency, Reason: payload.Reason,
+		}
+	case messagebus.PaymentProcessingUncertainType:
+		var payload messagebus.PaymentProcessingUncertain
+		if err := decode(message, &payload); err != nil {
+			return event, err
+		}
+		monetaryAmount, err := messagebus.ResolveMoney(payload.Money, payload.Amount, payload.Currency)
+		if err != nil {
+			return event, processcore.Invalid("decode %s money: %v", message.EventType, err)
+		}
+		event = payment.Event{
+			Kind: payment.EventPaymentUncertain, TransactionID: payload.TransactionID,
+			AgentID: payload.AgentID, Money: messagebus.MoneyPointer(monetaryAmount), Amount: payload.Amount, Currency: monetaryAmount.Currency, Reason: payload.Reason,
 		}
 	case messagebus.VolumeAccumulatedType:
 		var payload messagebus.VolumeAccumulated
@@ -54,6 +91,14 @@ func (c *Kafka) Decode(message *platformkafka.Message) (payment.Event, error) {
 		event = payment.Event{
 			Kind: payment.EventVolumeAccumulated, TransactionID: payload.TransactionID,
 			AgentID: payload.AgentID, Amount: payload.Amount, Rank: payload.CurrentRank,
+		}
+		if payload.Money != nil {
+			monetaryAmount, err := messagebus.ResolveMoney(payload.Money, payload.Amount, payload.Money.Currency)
+			if err != nil {
+				return event, processcore.Invalid("decode %s money: %v", message.EventType, err)
+			}
+			event.Money = messagebus.MoneyPointer(monetaryAmount)
+			event.Currency = monetaryAmount.Currency
 		}
 	case messagebus.CommissionCreditedType:
 		var payload messagebus.CommissionCredited
@@ -77,6 +122,13 @@ func (c *Kafka) Decode(message *platformkafka.Message) (payment.Event, error) {
 	default:
 		return event, processcore.Invalid("unsupported Kafka event %q", message.EventType)
 	}
+	event.MessageID = message.ID
+	event.OrchestrationOwner = message.OrchestrationOwner
+	event.OrchestrationGeneration = message.OrchestrationGeneration
+	if event.OrchestrationOwner == "" && event.OrchestrationGeneration == 0 {
+		event.OrchestrationOwner = c.orchestrationOwner
+		event.OrchestrationGeneration = c.orchestrationGeneration
+	}
 	if err := payment.ValidateEvent(event); err != nil {
 		return payment.Event{}, err
 	}
@@ -84,6 +136,29 @@ func (c *Kafka) Decode(message *platformkafka.Message) (payment.Event, error) {
 }
 
 func (c *Kafka) Encode(command payment.Command) (EncodedCommand, error) {
+	owner := command.OrchestrationOwner
+	generation := command.OrchestrationGeneration
+	if owner == "" && generation == 0 {
+		owner, generation = c.orchestrationOwner, c.orchestrationGeneration
+	}
+	if owner == "" || generation < 1 {
+		return EncodedCommand{}, fmt.Errorf("payment codec: orchestration owner and positive generation are required")
+	}
+	if c.orchestrationOwner != "" && (owner != c.orchestrationOwner || generation != c.orchestrationGeneration) {
+		return EncodedCommand{}, fmt.Errorf("payment codec: command owner %s generation %d does not match runtime %s generation %d",
+			owner, generation, c.orchestrationOwner, c.orchestrationGeneration)
+	}
+	monetaryAmount, err := command.MonetaryAmount()
+	if err != nil {
+		return EncodedCommand{}, fmt.Errorf("payment codec: invalid command money: %w", err)
+	}
+	if !monetaryAmount.IsPositive() {
+		return EncodedCommand{}, fmt.Errorf("payment codec: command money must be positive")
+	}
+	legacyAmount, err := messagebus.LegacyMajorFloat(monetaryAmount)
+	if err != nil {
+		return EncodedCommand{}, fmt.Errorf("payment codec: render legacy command money: %w", err)
+	}
 	var topic, messageType, step string
 	var payload any
 	switch command.Kind {
@@ -91,19 +166,20 @@ func (c *Kafka) Encode(command payment.Command) (EncodedCommand, error) {
 		topic, messageType, step = c.topics.AffiliateCommands, messagebus.AccumulateVolumeRequestedType, messagebus.StepAffiliate
 		payload = messagebus.AccumulateVolumeRequested{
 			TransactionID: command.TransactionID, AgentID: command.AgentID,
-			Amount: command.Amount, Currency: command.Currency,
+			Money: messagebus.MoneyPointer(monetaryAmount), Amount: legacyAmount, Currency: monetaryAmount.Currency,
 		}
 	case payment.CommandCreditCommission:
 		topic, messageType, step = c.topics.SettlementCommands, messagebus.CreditCommissionRequestedType, messagebus.StepSettlement
 		payload = messagebus.CreditCommissionRequested{
 			TransactionID: command.TransactionID, AgentID: command.AgentID,
-			TransactionAmount: command.Amount, Rank: command.Rank,
+			TransactionMoney: messagebus.MoneyPointer(monetaryAmount), TransactionAmount: legacyAmount,
+			Currency: monetaryAmount.Currency, Rank: command.Rank,
 		}
 	case payment.CommandDispatchCallback:
 		topic, messageType, step = c.topics.AgentCommands, messagebus.DispatchCallbackRequestedType, messagebus.StepCallback
 		payload = messagebus.DispatchCallbackRequested{
 			TransactionID: command.TransactionID, AgentID: command.AgentID,
-			Amount: command.Amount, Currency: command.Currency,
+			Money: messagebus.MoneyPointer(monetaryAmount), Amount: legacyAmount, Currency: monetaryAmount.Currency,
 		}
 	default:
 		return EncodedCommand{}, fmt.Errorf("payment codec: unsupported command %q", command.Kind)
@@ -115,17 +191,27 @@ func (c *Kafka) Encode(command payment.Command) (EncodedCommand, error) {
 	return EncodedCommand{
 		Topic: topic, Key: command.TransactionID,
 		Message: &platformkafka.Message{
-			ID: messagebus.MessageID(command.TransactionID, step), EventType: messageType,
+			ID: orchestrationMessageID(command.TransactionID, step, generation), EventType: messageType,
 			AggregateType: "PaymentSaga", AggregateID: command.TransactionID, Payload: encoded,
+			SchemaVersion: 1, CorrelationID: command.TransactionID,
+			OrchestrationOwner: owner, OrchestrationGeneration: generation,
 		},
 	}, nil
+}
+
+func orchestrationMessageID(transactionID, step string, generation int64) string {
+	base := messagebus.MessageID(transactionID, step)
+	if generation <= 1 {
+		return base
+	}
+	return fmt.Sprintf("%s:g%d", base, generation)
 }
 
 func (c *Kafka) TopicFor(eventType string) string {
 	switch eventType {
 	case messagebus.PaymentInitiatedType:
 		return c.topics.PaymentInitiatedEvents
-	case messagebus.PaymentCompletedType:
+	case messagebus.PaymentCompletedType, messagebus.PaymentFailedType, messagebus.PaymentProcessingUncertainType:
 		return c.topics.PaymentEvents
 	case messagebus.VolumeAccumulatedType:
 		return c.topics.AffiliateEvents

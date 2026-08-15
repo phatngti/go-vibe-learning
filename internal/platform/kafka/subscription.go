@@ -6,6 +6,7 @@ package kafka
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github/master_go_cqrs/internal/platform/observability/logger"
 
@@ -43,10 +44,7 @@ func RunSubscriptions(params subscriptionParams) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					if err := params.Consumer.Subscribe(ctx, subscription.Topic, subscription.GroupID, subscription.Handler); err != nil && ctx.Err() == nil {
-						params.Logger.Bg().Error("Kafka subscription stopped",
-							zap.String("topic", subscription.Topic), zap.Error(err))
-					}
+					runSubscriptionSupervisor(ctx, params.Consumer, subscription, params.Logger)
 				}()
 			}
 			return nil
@@ -60,4 +58,22 @@ func RunSubscriptions(params subscriptionParams) {
 			return nil
 		},
 	})
+}
+
+func runSubscriptionSupervisor(ctx context.Context, consumer Consumer, subscription Subscription, log logger.Factory) {
+	restartAttempt := 0
+	for {
+		err := consumer.Subscribe(ctx, subscription.Topic, subscription.GroupID, subscription.Handler)
+		if ctx.Err() != nil {
+			return
+		}
+		restartAttempt++
+		delay := min(time.Duration(1<<min(restartAttempt-1, 6))*time.Second, 30*time.Second)
+		log.Bg().Error("Kafka subscription stopped; restarting",
+			zap.String("topic", subscription.Topic), zap.String("group_id", subscription.GroupID),
+			zap.Duration("restart_delay", delay), zap.Error(err))
+		if waitForRetry(ctx, delay) != nil {
+			return
+		}
+	}
 }

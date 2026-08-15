@@ -23,10 +23,19 @@ type Middleware interface {
 	AuthorizeWithResource(resource string, scopes []string) echo.MiddlewareFunc
 }
 
-type middleware struct{}
+type middleware struct {
+	authenticator PrincipalAuthenticator
+}
 
 func NewMiddleware() Middleware {
-	return middleware{}
+	return middleware{authenticator: forwardedPayloadAuthenticator{}}
+}
+
+// NewVerifiedMiddleware is the production constructor. It verifies the bearer
+// token independently at the service boundary before exposing any claims to a
+// command or query handler.
+func NewVerifiedMiddleware(authenticator PrincipalAuthenticator) Middleware {
+	return middleware{authenticator: authenticator}
 }
 
 func (m middleware) Authorize() echo.MiddlewareFunc {
@@ -40,7 +49,11 @@ func (m middleware) AuthorizeWithResource(resource string, scopes []string) echo
 func (m middleware) authorize(resource string, scopes []string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			user, err := DecodeUserPayload(c.Request().Header.Get(PayloadHeader))
+			user, err := m.authenticator.Authenticate(
+				c.Request().Context(),
+				c.Request().Header.Get(echo.HeaderAuthorization),
+				c.Request().Header.Get(PayloadHeader),
+			)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, response.WrapError(MessageCode, GatewayAuthFailed, nil))
 			}
@@ -57,8 +70,16 @@ func (m middleware) authorize(resource string, scopes []string) echo.MiddlewareF
 }
 
 func ExtAuthzCheck(prefix string, authorizer RouteAuthorizer) echo.HandlerFunc {
+	return ExtAuthzCheckWithAuthenticator(prefix, authorizer, forwardedPayloadAuthenticator{})
+}
+
+func ExtAuthzCheckWithAuthenticator(prefix string, authorizer RouteAuthorizer, authenticator PrincipalAuthenticator) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		user, err := DecodeUserPayload(c.Request().Header.Get(PayloadHeader))
+		user, err := authenticator.Authenticate(
+			c.Request().Context(),
+			c.Request().Header.Get(echo.HeaderAuthorization),
+			c.Request().Header.Get(PayloadHeader),
+		)
 		if err != nil {
 			return c.NoContent(http.StatusUnauthorized)
 		}

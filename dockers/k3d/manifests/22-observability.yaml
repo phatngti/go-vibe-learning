@@ -67,6 +67,9 @@ spec:
     - name: health
       port: 13133
       targetPort: health
+    - name: metrics
+      port: 9464
+      targetPort: metrics
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -96,6 +99,8 @@ spec:
               containerPort: 4318
             - name: health
               containerPort: 13133
+            - name: metrics
+              containerPort: 9464
           readinessProbe:
             httpGet:
               path: /

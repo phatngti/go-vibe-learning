@@ -46,7 +46,7 @@ func (r *Repository) DueIDs(ctx context.Context, limit int) ([]string, error) {
 	var transactionIDs []string
 	err := r.db.WithContext(ctx).Model(&paymentsaga.Model{}).
 		Where("state IN ? AND next_retry_at <= ?", []payment.State{
-			payment.StateWaitingAffiliate, payment.StateWaitingSettlement, payment.StateWaitingCallback,
+			payment.StateWaitingPayment, payment.StateWaitingAffiliate, payment.StateWaitingSettlement, payment.StateWaitingCallback,
 		}, time.Now()).Order("next_retry_at").Limit(limit).Pluck("transaction_id", &transactionIDs).Error
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: list due payment processes: %w", err)

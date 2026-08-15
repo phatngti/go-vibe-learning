@@ -18,6 +18,7 @@ func WorkflowID(transactionID string) string {
 }
 
 type WorkflowState struct {
-	Snapshot payment.Snapshot `json:"snapshot"`
-	Attempt  int              `json:"attempt"`
+	Snapshot       payment.Snapshot `json:"snapshot"`
+	Attempt        int              `json:"attempt"`
+	SeenMessageIDs []string         `json:"seen_message_ids,omitempty"`
 }

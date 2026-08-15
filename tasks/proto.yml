@@ -38,7 +38,7 @@ tasks:
       - |
         set -eu
         export PATH="$(go env GOPATH)/bin:$PATH"
-        mkdir -p docs dockers/envoy
+        mkdir -p docs/api dockers/envoy
         protoc_bin="${PROTOC:-}"
         if [ -z "$protoc_bin" ]; then
           for candidate in /opt/homebrew/bin/protoc /usr/local/bin/protoc /usr/bin/protoc "$(command -v protoc 2>/dev/null || true)"; do
@@ -62,7 +62,7 @@ tasks:
           --descriptor_set_out=dockers/envoy/proto.pb \
           contracts/proto/*.proto
         "$protoc_bin" -Icontracts -I. -Ithird_party -I"$grpc_gateway_dir" \
-          --openapiv2_out=allow_merge=true,merge_file_name=envoy,json_names_for_fields=false,logtostderr=true:docs \
+          --openapiv2_out=allow_merge=true,merge_file_name=envoy,json_names_for_fields=false,logtostderr=true:docs/api \
           contracts/proto/*.proto
         # Inject securityDefinitions into the gRPC gateway spec so Swagger UI
         # shows the Authorize button for JWT auth and OAuth2 direct login.
@@ -85,8 +85,8 @@ tasks:
             }
           },
           "security": [{"BearerAuth": []}, {"OAuth2": ["openid"]}]
-        }' docs/envoy.swagger.json > "$tmp" && mv "$tmp" docs/envoy.swagger.json
-        echo "Injected securityDefinitions into docs/envoy.swagger.json"
+        }' docs/api/envoy.swagger.json > "$tmp" && mv "$tmp" docs/api/envoy.swagger.json
+        echo "Injected securityDefinitions into docs/api/envoy.swagger.json"
 
   swagger-tools:
     desc: Install Swaggo CLI needed for API Swagger generation
@@ -108,22 +108,22 @@ tasks:
         swag init \
           --generalInfo main.go \
           --dir ./cmd/user,./services,./internal \
-          --output docs \
-          --outputTypes json,yaml \
+          --output docs/api \
+          --outputTypes json \
           --parseInternal \
           --quiet
         # Inject OAuth2 scopes into all endpoints requiring BearerAuth
         tmp="$(mktemp)"
-        jq '.paths[][] |= (if .security then .security += [{"OAuth2": ["openid"]}] else . end)' docs/swagger.json > "$tmp" && mv "$tmp" docs/swagger.json
-        echo "Injected OAuth2 security requirements into docs/swagger.json"
+        jq '.paths[][] |= (if .security then .security += [{"OAuth2": ["openid"]}] else . end)' docs/api/swagger.json > "$tmp" && mv "$tmp" docs/api/swagger.json
+        echo "Injected OAuth2 security requirements into docs/api/swagger.json"
 
   gen-docs:
     desc: Regenerate both REST Swagger docs and gRPC gateway Swagger docs
     cmds:
       - task: gen-swagger
       - task: gen-proto
-      - 'echo "REST docs: docs/swagger.json"'
-      - 'echo "gRPC docs: docs/envoy.swagger.json"'
+      - 'echo "REST docs: docs/api/swagger.json"'
+      - 'echo "gRPC docs: docs/api/envoy.swagger.json"'
 
   swagger-refresh:
     desc: Regenerate Swagger docs and update the k3d Swagger UI/API gateway services

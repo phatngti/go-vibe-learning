@@ -23,7 +23,7 @@ func TestPaymentWorkflowCompletesWithDelayedOutOfOrderSignals(t *testing.T) {
 		env.SignalWorkflow(ProcessEventSignalName, payment.Event{
 			Kind: payment.EventCommissionCredited, TransactionID: "tx-1", AgentID: "agent-1",
 		})
-	}, time.Second)
+	}, 500*time.Millisecond)
 	env.RegisterDelayedCallback(func() {
 		event := payment.Event{Kind: payment.EventVolumeAccumulated, TransactionID: "tx-1", AgentID: "agent-1", Rank: "SILVER"}
 		env.SignalWorkflow(ProcessEventSignalName, event)
@@ -48,8 +48,10 @@ func TestPaymentWorkflowCompletesWithDelayedOutOfOrderSignals(t *testing.T) {
 	if result.Snapshot.State != payment.StateCompleted {
 		t.Fatalf("state = %q, want completed", result.Snapshot.State)
 	}
-	if len(*published) != 3 {
-		t.Fatalf("published commands = %d, want 3", len(*published))
+	// The already-buffered CommissionCredited fact proves settlement happened,
+	// so v2 advances without emitting a redundant settlement command.
+	if len(*published) != 2 {
+		t.Fatalf("published commands = %d, want 2", len(*published))
 	}
 }
 
@@ -75,20 +77,80 @@ func TestPaymentWorkflowCallbackFailureIsTerminal(t *testing.T) {
 	}
 }
 
-func TestPaymentWorkflowStopsAfterFiveTimedOutCommands(t *testing.T) {
+func TestPaymentWorkflowRecoversAfterFiveTimedOutCommands(t *testing.T) {
 	env, published := newWorkflowEnvironment(t)
+	var review WorkflowState
+	env.RegisterDelayedCallback(func() {
+		value, err := env.QueryWorkflow(WorkflowStateQuery)
+		if err != nil {
+			t.Fatalf("QueryWorkflow() error = %v", err)
+		}
+		if err := value.Get(&review); err != nil {
+			t.Fatal(err)
+		}
+		env.SignalWorkflow(ProcessEventSignalName, payment.Event{
+			MessageID: "volume-late", Kind: payment.EventVolumeAccumulated,
+			TransactionID: "tx-3", AgentID: "agent-3", Rank: "SILVER",
+		})
+	}, payment.MaxAttempts*payment.StepTimeout+time.Second)
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(ProcessEventSignalName, payment.Event{
+			MessageID: "commission-late", Kind: payment.EventCommissionCredited,
+			TransactionID: "tx-3", AgentID: "agent-3",
+		})
+	}, payment.MaxAttempts*payment.StepTimeout+2*time.Second)
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(ProcessEventSignalName, payment.Event{
+			MessageID: "callback-late", Kind: payment.EventCallbackCompleted,
+			TransactionID: "tx-3", AgentID: "agent-3", CallbackStatus: "SKIPPED",
+		})
+	}, payment.MaxAttempts*payment.StepTimeout+3*time.Second)
 	env.ExecuteWorkflow(PaymentWorkflow, payment.Event{
-		Kind: payment.EventPaymentCompleted, TransactionID: "tx-3", AgentID: "agent-3", Amount: 100, Currency: "USD",
+		MessageID: "payment-completed", Kind: payment.EventPaymentCompleted,
+		TransactionID: "tx-3", AgentID: "agent-3", Amount: 100, Currency: "USD",
 	})
 	var result WorkflowState
 	if err := env.GetWorkflowResult(&result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Snapshot.State != payment.StateFailed || result.Attempt != 0 {
+	if review.Snapshot.State != payment.StateNeedsManualReview || review.Snapshot.ResumeState != payment.StateWaitingAffiliate {
+		t.Fatalf("review = %+v", review)
+	}
+	if result.Snapshot.State != payment.StateCompleted || result.Attempt != 0 {
 		t.Fatalf("result = %+v", result)
 	}
-	if len(*published) != payment.MaxAttempts {
-		t.Fatalf("published commands = %d, want %d", len(*published), payment.MaxAttempts)
+	if len(*published) != payment.MaxAttempts+2 {
+		t.Fatalf("published commands = %d, want %d", len(*published), payment.MaxAttempts+2)
+	}
+}
+
+func TestPaymentWorkflowStartsAtInitiatedAndWaitsForProviderOutcome(t *testing.T) {
+	env, published := newWorkflowEnvironment(t)
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(ProcessEventSignalName, payment.Event{
+			MessageID: "completed", Kind: payment.EventPaymentCompleted,
+			TransactionID: "tx-init", AgentID: "agent-1", Amount: 100, Currency: "USD",
+		})
+	}, 500*time.Millisecond)
+	signalHappyFinancialPath(env, "tx-init", "agent-1")
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(ProcessEventSignalName, payment.Event{
+			Kind: payment.EventCallbackCompleted, TransactionID: "tx-init", AgentID: "agent-1", CallbackStatus: "SKIPPED",
+		})
+	}, 3*time.Second)
+	env.ExecuteWorkflow(PaymentWorkflow, payment.Event{
+		MessageID: "initiated", Kind: payment.EventPaymentInitiated,
+		TransactionID: "tx-init", AgentID: "agent-1", Amount: 100, Currency: "USD",
+	})
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatal(err)
+	}
+	var result WorkflowState
+	if err := env.GetWorkflowResult(&result); err != nil || result.Snapshot.State != payment.StateCompleted {
+		t.Fatalf("result = %+v, error = %v", result, err)
+	}
+	if len(*published) != 3 {
+		t.Fatalf("published commands = %d, want 3", len(*published))
 	}
 }
 

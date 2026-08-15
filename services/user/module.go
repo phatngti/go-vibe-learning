@@ -36,7 +36,15 @@ var Module = fx.Module("user",
 		userkeycloak.NewAuthProvider,
 		userkeycloak.NewSyncGateway,
 		userpostgres.NewUserRepository,
+		userpostgres.NewUserSyncJobRepository,
 		userpostgres.NewUnitOfWork,
+		func(cfg *config.Config) command.UserSyncJobPolicy {
+			return command.UserSyncJobPolicy{
+				PageSize: cfg.SyncJobs.PageSize, LeaseDuration: cfg.SyncJobs.LeaseDuration,
+				ProviderTimeout: cfg.SyncJobs.ProviderTimeout, MaxAttempts: cfg.SyncJobs.MaxAttempts,
+				RetryBaseDelay: cfg.SyncJobs.RetryBaseDelay, RetryMaxDelay: cfg.SyncJobs.RetryMaxDelay,
+			}
+		},
 
 		// Application — Authentication commands
 		command.NewAuthentication,
@@ -49,6 +57,8 @@ var Module = fx.Module("user",
 
 		// Application — User management
 		command.NewSyncUsersHandler,
+		command.NewRequestUserSyncHandler,
+		command.NewUserSyncJobRunner,
 		query.NewGetUserHandler,
 		query.NewGetUserByProviderIDHandler,
 		query.NewListUsersHandler,
@@ -63,10 +73,12 @@ var Module = fx.Module("user",
 		eventstore.NewConsumer,
 		userconsumer.NewUserRegisteredHandler,
 		userconsumer.NewUserRegisteredWorker,
+		userconsumer.NewUserSyncJobWorker,
 	),
 	fx.Invoke(
 		usergrpc.RequireServerHandler,
 		(*userconsumer.UserRegisteredWorker).Start,
+		(*userconsumer.UserSyncJobWorker).Start,
 	),
 )
 

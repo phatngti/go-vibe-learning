@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Go quality and architecture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.13
+          cache: true
+      - name: Verify formatting
+        shell: bash
+        run: |
+          files="$(gofmt -l $(find cmd contracts internal services tools -name '*.go' -type f))"
+          if [ -n "$files" ]; then
+            echo "The following Go files are not formatted:"
+            echo "$files"
+            exit 1
+          fi
+      - name: Vet
+        run: go vet ./...
+      - name: Unit and architecture tests
+        run: go test ./... -count=1
+      - name: Focused race tests
+        run: go test -race ./internal/platform/... ./internal/shared/... ./services/... -count=1
+      - name: Temporal workflow replay gate
+        run: go test ./services/orchestrator/internal/payment/temporal -run Replay -count=1
+      - name: Dependency boundaries
+        run: go test ./internal/architecture -run TestDependencyBoundaries -count=1
+      - name: Documentation links
+        run: go run ./tools/doc-link-check README.md docs
+      - name: Whitespace validation
+        run: git diff --check
+
+  migrations:
+    name: PostgreSQL migration round trip
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply up, down, and up migrations
+        run: ./tools/ci/migration-roundtrip.sh
+      - name: Build and exercise immutable migration artifact
+        shell: bash
+        run: |
+          psql -v ON_ERROR_STOP=1 -d postgres -c 'CREATE DATABASE artifact_agent'
+          docker build --target migrations -t cqrs-migrations:ci .
+          for run in 1 2; do
+            docker run --rm --read-only --network host \
+              -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGDATABASE=artifact_agent \
+              -e PGUSER=postgres -e PGPASSWORD=postgres -e PGSSLMODE=disable \
+              cqrs-migrations:ci agent
+          done
+
+  generated-contracts:
+    name: Generated API contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.13
+          cache: true
+      - name: Install system tools
+        run: sudo apt-get update && sudo apt-get install -y jq protobuf-compiler
+      - name: Install Task
+        run: go install github.com/go-task/task/v3/cmd/task@v3.44.1
+      - uses: bufbuild/buf-setup-action@v1
+      - name: Compile Protobuf workspace
+        run: buf build
+      - name: Reject breaking Protobuf changes
+        shell: bash
+        run: |
+          if git cat-file -e origin/main:buf.yaml 2>/dev/null; then
+            buf breaking --against '.git#branch=origin/main'
+          else
+            echo 'No baseline buf.yaml on main yet; buf build is the bootstrap gate.'
+          fi
+      - name: Regenerate contracts and documentation
+        run: '"$(go env GOPATH)/bin/task" gen-docs'
+      - name: Verify generated files are committed
+        run: git diff --exit-code -- contracts/genproto docs/api dockers/envoy/proto.pb
+
+  security:
+    name: Secrets, SAST, dependencies, and filesystem CVEs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.13
+          cache: true
+      - name: Go vulnerability reachability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+      - name: Go static application security scan
+        uses: securego/gosec@v2.28.0
+        with:
+          args: -exclude-generated -severity medium -confidence medium ./...
+      - name: Secret and credential scan
+        uses: docker://ghcr.io/gitleaks/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
+        with:
+          args: detect --source=/github/workspace --config=/github/workspace/.gitleaks.toml --no-banner --redact --verbose
+      - name: Dependency and filesystem vulnerability scan
+        uses: anchore/scan-action@v7
+        with:
+          path: .
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+
+  helm:
+    name: Production Helm contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Lint application chart
+        run: helm lint deploy/helm/master-go-cqrs
+      - name: Render production resources
+        run: helm template cqrs deploy/helm/master-go-cqrs --namespace payments > /tmp/master-go-cqrs.yaml

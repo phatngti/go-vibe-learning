@@ -19,7 +19,7 @@ gateway:
 keycloak:
   endpoint: "http://keycloak.master-go-cqrs.svc.cluster.local:8080"
   clientId: "master-go-cqrs"
-  clientSecret: "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
+  clientSecret: "local-dev-client-secret-change-me"
   customHeaderName: "Authorization"
   realm: "backend"
 
@@ -30,7 +30,10 @@ otel:
 kafka:
   brokers:
     - "kafka.master-go-cqrs.svc.cluster.local:9092"
+  consumerMaxAttempts: 8
+  retryMaxDelay: 30s
   topics:
+    paymentInitiatedEvents: "payments.initiated"
     paymentEvents: "payments.events"
     affiliateCommands: "affiliate.commands"
     affiliateEvents: "affiliate.events"
@@ -38,3 +41,35 @@ kafka:
     settlementEvents: "settlement.events"
     agentCommands: "agent.commands"
     agentEvents: "agent.events"
+
+outbox:
+  enabled: true
+  pollInterval: 100ms
+  batchSize: 500
+  parallelism: 16
+  staleAfter: 2m
+  maxAttempts: 20
+
+initiation:
+  # Production profile must override this to true.
+  requireIdempotency: false
+
+reconciliation:
+  enabled: true
+  interval: 15s
+  staleAfter: 2m
+  batchSize: 100
+
+paymentProvider:
+  # Local development defaults to the deterministic simulator. Production must
+  # set PAYMENT_PROVIDER=stripe and supply secrets through a secret manager.
+  kind: "simulator"
+  stripe:
+    baseUrl: "https://api.stripe.com"
+    httpTimeout: 10s
+    webhookTolerance: 5m
+
+legacyCheckout:
+  # The v1 endpoint accepts raw card data and exists only for local learning.
+  # Config.RawCardEnabled always returns false when logger.mode=production.
+  rawCardEnabled: true

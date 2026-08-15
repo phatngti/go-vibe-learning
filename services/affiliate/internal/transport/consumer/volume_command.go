@@ -44,12 +44,16 @@ func (h *VolumeCommandHandler) Handle(ctx context.Context, msg *kafka.Message) e
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		return kafka.Permanent(fmt.Errorf("affiliate: decode volume command: %w", err))
 	}
-	if payload.TransactionID == "" || payload.AgentID == "" || payload.Amount <= 0 {
+	monetaryAmount, err := messagebus.ResolveMoney(payload.Money, payload.Amount, payload.Currency)
+	if err != nil {
+		return kafka.Permanent(fmt.Errorf("affiliate: invalid volume money: %w", err))
+	}
+	if payload.TransactionID == "" || payload.AgentID == "" || !monetaryAmount.IsPositive() {
 		return kafka.Permanent(fmt.Errorf("affiliate: invalid volume command payload"))
 	}
 	dedupID := messagebus.MessageID(payload.TransactionID, messagebus.StepAffiliate)
 	return h.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		fresh, err := h.inbox.Begin(ctx, tx, dedupID, h.topic, msg.EventType)
+		fresh, err := h.inbox.Begin(ctx, tx, "affiliate-service", dedupID, h.topic, msg.EventType)
 		if err != nil || !fresh {
 			return err
 		}
@@ -58,10 +62,12 @@ func (h *VolumeCommandHandler) Handle(ctx context.Context, msg *kafka.Message) e
 		if _, _, _, err := h.handler.HandleInTx(txCtx, tx, &dto.AccumulateVolume{
 			TransactionID: payload.TransactionID,
 			AgentID:       payload.AgentID,
+			Money:         messagebus.MoneyPointer(monetaryAmount),
 			Amount:        payload.Amount,
+			Currency:      payload.Currency,
 		}); err != nil {
 			return err
 		}
-		return h.inbox.MarkProcessed(ctx, tx, dedupID)
+		return h.inbox.MarkProcessed(ctx, tx, "affiliate-service", dedupID)
 	})
 }

@@ -5,6 +5,9 @@ import "testing"
 func TestDecodeUserPayloadMapsKeycloakClaims(t *testing.T) {
 	payload, err := EncodeUserPayloadForTest(map[string]any{
 		"sub":                "user-1",
+		"tenant_id":          "tenant-1",
+		"agent_id":           "agent-1",
+		"iss":                "https://identity.example/realms/backend",
 		"preferred_username": "alice",
 		"given_name":         "Alice",
 		"family_name":        "Nguyen",
@@ -32,6 +35,12 @@ func TestDecodeUserPayloadMapsKeycloakClaims(t *testing.T) {
 
 	if user.ID != "user-1" || user.Username != "alice" || user.Audience != "master-go-cqrs" {
 		t.Fatalf("unexpected user: %+v", user)
+	}
+	if user.TenantID != "tenant-1" || user.AgentID != "agent-1" || user.Issuer != "https://identity.example/realms/backend" {
+		t.Fatalf("unexpected ownership claims: %+v", user)
+	}
+	if len(user.Scopes) != 2 || user.Scopes[0] != "openid" || user.Scopes[1] != "profile" {
+		t.Fatalf("scopes = %#v, want openid/profile", user.Scopes)
 	}
 	if len(user.Roles) != 1 || user.Roles[0] != "admin" {
 		t.Fatalf("roles = %#v, want admin", user.Roles)

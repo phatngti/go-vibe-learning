@@ -10,6 +10,7 @@ import (
 	"github/master_go_cqrs/internal/platform/config"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
@@ -61,7 +62,11 @@ func SetUpOtelSdk(config *config.Otel, ctx context.Context) (shutdown func(ctx c
 	otel.SetTracerProvider(traceProv)
 
 	// Set up meter provider
-	meterProv, err := newMeterProvider()
+	metricsEndpoint := strings.TrimSpace(config.MetricsEndpoint)
+	if metricsEndpoint == "" {
+		metricsEndpoint = config.Endpoint
+	}
+	meterProv, err := newMeterProvider(metricsEndpoint, config.Service, config.MetricsExportInterval)
 
 	if err != nil {
 		handleErr(err)
@@ -99,14 +104,7 @@ func newTraceProvider(endpoint string, service string) (*trace.TracerProvider, e
 		return nil, err
 	}
 
-	rs, err := resource.New(
-		context.Background(),
-		resource.WithAttributes(semconv.ServiceNameKey.String(service)),
-		resource.WithTelemetrySDK(),
-		resource.WithHost(),
-		resource.WithOSType(),
-		resource.WithProcessRuntimeDescription(),
-	)
+	rs, err := newResource(service)
 
 	if err != nil {
 		return nil, err
@@ -168,10 +166,45 @@ func newTraceEndpointConfig(endpoint string) traceEndpointConfig {
 	}
 }
 
-func newMeterProvider() (*metric.MeterProvider, error) {
+func newMeterProvider(endpoint, service string, interval time.Duration) (*metric.MeterProvider, error) {
+	exporter, err := otlpmetrichttp.New(context.Background(), metricHTTPClientOptions(endpoint)...)
+	if err != nil {
+		return nil, err
+	}
+	if interval <= 0 {
+		interval = 15 * time.Second
+	}
+	rs, err := newResource(service)
+	if err != nil {
+		return nil, err
+	}
+	reader := metric.NewPeriodicReader(exporter, metric.WithInterval(interval))
+	return metric.NewMeterProvider(metric.WithReader(reader), metric.WithResource(rs)), nil
+}
 
-	meterProvider := metric.NewMeterProvider()
-	return meterProvider, nil
+func metricHTTPClientOptions(endpoint string) []otlpmetrichttp.Option {
+	cfg := newTraceEndpointConfig(endpoint)
+	opts := make([]otlpmetrichttp.Option, 0, 2)
+	if cfg.endpointURL != "" {
+		opts = append(opts, otlpmetrichttp.WithEndpointURL(cfg.endpointURL))
+	} else {
+		opts = append(opts, otlpmetrichttp.WithEndpoint(cfg.endpoint))
+	}
+	if cfg.insecure {
+		opts = append(opts, otlpmetrichttp.WithInsecure())
+	}
+	return opts
+}
+
+func newResource(service string) (*resource.Resource, error) {
+	return resource.New(
+		context.Background(),
+		resource.WithAttributes(semconv.ServiceNameKey.String(service)),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithOSType(),
+		resource.WithProcessRuntimeDescription(),
+	)
 }
 
 func newLoggerProvider() (*log.LoggerProvider, error) {

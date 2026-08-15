@@ -12,9 +12,11 @@ import (
 	"github/master_go_cqrs/services/payment/internal/domain"
 )
 
-// ProcessPaymentHandler charges a payment gateway, transitions the transaction
-// state, and atomically appends the resulting domain event to the event store.
-// The event store relay automatically forwards matching events to the outbox.
+const processingLease = 30 * time.Second
+
+// ProcessPaymentHandler claims one logical payment attempt before contacting
+// the provider. Provider calls use a stable idempotency key, while the final
+// transaction state, domain event, and relay outbox row commit atomically.
 type ProcessPaymentHandler struct {
 	uow        port.UnitOfWork
 	repo       port.TransactionRepository
@@ -28,44 +30,65 @@ func NewProcessPaymentHandler(
 	gateway port.PaymentGateway,
 	eventStore eventstore.Repository,
 ) *ProcessPaymentHandler {
-	return &ProcessPaymentHandler{
-		uow:        uow,
-		repo:       repo,
-		gateway:    gateway,
-		eventStore: eventStore,
-	}
+	return &ProcessPaymentHandler{uow: uow, repo: repo, gateway: gateway, eventStore: eventStore}
 }
 
 func (h *ProcessPaymentHandler) Handle(ctx context.Context, cmd *dto.ProcessPayment) (*domain.Transaction, error) {
-	txRecord, err := h.repo.GetByID(ctx, cmd.TransactionID)
+	idempotencyKey := cmd.IdempotencyKey
+	if idempotencyKey == "" {
+		// A payment transaction represents one provider charge attempt. The stable
+		// fallback makes retries safe even for legacy callers that do not yet send
+		// an explicit key.
+		idempotencyKey = "payment:" + cmd.TransactionID + ":charge"
+	}
+
+	txRecord, claimed, err := h.repo.ClaimForProcessing(ctx, cmd.TransactionID, idempotencyKey, time.Now().Add(-processingLease))
 	if err != nil {
 		return nil, err
 	}
-
-	if txRecord.Status != domain.StatePending {
-		return nil, fmt.Errorf("transaction %s is already processed", cmd.TransactionID)
+	if !claimed {
+		switch txRecord.Status {
+		case domain.StateCompleted, domain.StateFailed:
+			return txRecord, nil
+		default:
+			return nil, domain.ErrPaymentInProgress
+		}
 	}
 
-	chargeReq := &domain.GatewayChargeRequest{
-		TransactionID: txRecord.ID,
-		Amount:        txRecord.Amount,
-		Currency:      txRecord.Currency,
-		CardNumber:    cmd.CardNumber,
-		CVV:           cmd.CVV,
-	}
+	chargeRes, chargeErr := h.gateway.Charge(ctx, &domain.GatewayChargeRequest{
+		TransactionID:  txRecord.ID,
+		Amount:         txRecord.Amount,
+		Currency:       txRecord.Currency,
+		CardNumber:     cmd.CardNumber,
+		CVV:            cmd.CVV,
+		IdempotencyKey: idempotencyKey,
+	})
 
-	chargeRes, chargeErr := h.gateway.Charge(ctx, chargeReq)
-	var finalState domain.TransactionState
-	if chargeErr != nil || !chargeRes.Success {
-		finalState = domain.StateFailed
+	finalState := domain.StateUnknown
+	lastError := ""
+	providerReference := ""
+	if chargeErr != nil {
+		// Transport/system errors are ambiguous. The provider may have accepted
+		// the charge before the response was lost.
+		lastError = chargeErr.Error()
+	} else if chargeRes == nil {
+		lastError = "payment provider returned an empty response"
 	} else {
-		finalState = domain.StateCompleted
+		providerReference = chargeRes.Reference
+		if chargeRes.Success {
+			finalState = domain.StateCompleted
+		} else {
+			finalState = domain.StateFailed
+			lastError = chargeRes.Message
+			if lastError == "" {
+				lastError = "payment provider declined the charge"
+			}
+		}
 	}
 
 	var updatedTx *domain.Transaction
-
 	err = h.uow.Do(ctx, func(txCtx context.Context) error {
-		if err := h.repo.UpdateStatus(txCtx, txRecord.ID, finalState); err != nil {
+		if err := h.repo.FinalizeProcessing(txCtx, txRecord.ID, idempotencyKey, finalState, providerReference, lastError); err != nil {
 			return err
 		}
 
@@ -74,67 +97,57 @@ func (h *ProcessPaymentHandler) Handle(ctx context.Context, cmd *dto.ProcessPaym
 		if err != nil {
 			return err
 		}
-
-		now := time.Now()
-		var (
-			evtType  string
-			evtBytes []byte
-		)
-
-		if finalState == domain.StateCompleted {
-			evt := domain.PaymentCompleted{
-				TransactionID: updatedTx.ID,
-				AgentID:       updatedTx.AgentID,
-				CustomerID:    updatedTx.CustomerID,
-				Amount:        updatedTx.Amount,
-				Currency:      updatedTx.Currency,
-				OccurredAt:    now,
-			}
-			evtType = evt.EventType()
-			evtBytes, err = json.Marshal(evt)
-			if err != nil {
-				return fmt.Errorf("process_payment: marshal PaymentCompleted: %w", err)
-			}
-		} else {
-			reason := "charge declined"
-			if chargeErr != nil {
-				reason = chargeErr.Error()
-			}
-			evt := domain.PaymentFailed{
-				TransactionID: updatedTx.ID,
-				AgentID:       updatedTx.AgentID,
-				Amount:        updatedTx.Amount,
-				Currency:      updatedTx.Currency,
-				Reason:        reason,
-				OccurredAt:    now,
-			}
-			evtType = evt.EventType()
-			evtBytes, err = json.Marshal(evt)
-			if err != nil {
-				return fmt.Errorf("process_payment: marshal PaymentFailed: %w", err)
-			}
+		eventType, payload, err := paymentResultEvent(updatedTx, finalState, lastError)
+		if err != nil {
+			return err
 		}
-
-		return h.appendEvent(ctx, updatedTx.ID, evtType, evtBytes)
+		version, err := h.eventStore.NextVersion(txCtx, nil, "Transaction", updatedTx.ID)
+		if err != nil {
+			return err
+		}
+		return h.eventStore.AppendEvent(txCtx, nil, &eventstore.DomainEvent{
+			AggregateType: "Transaction",
+			AggregateID:   updatedTx.ID,
+			EventType:     eventType,
+			Payload:       string(payload),
+			Version:       version,
+		})
 	})
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to complete process payment transaction: %w", err)
+		return nil, fmt.Errorf("finalize payment result: %w", err)
 	}
-
 	return updatedTx, nil
 }
 
-func (h *ProcessPaymentHandler) appendEvent(ctx context.Context, aggregateID, eventType string, payload []byte) error {
-	version, err := h.eventStore.NextVersion(ctx, nil, "Transaction", aggregateID)
+func paymentResultEvent(tx *domain.Transaction, state domain.TransactionState, reason string) (string, []byte, error) {
+	now := time.Now()
+	monetaryAmount, err := tx.MonetaryAmount()
 	if err != nil {
-		return err
+		return "", nil, fmt.Errorf("resolve payment money: %w", err)
 	}
-	return h.eventStore.AppendEvent(ctx, nil, &eventstore.DomainEvent{
-		AggregateType: "Transaction",
-		AggregateID:   aggregateID,
-		EventType:     eventType,
-		Payload:       string(payload),
-		Version:       version,
-	})
+	var event domain.Event
+	switch state {
+	case domain.StateCompleted:
+		event = domain.PaymentCompleted{
+			TransactionID: tx.ID, AgentID: tx.AgentID, CustomerID: tx.CustomerID,
+			Money: &monetaryAmount, Amount: tx.Amount, Currency: tx.Currency, OccurredAt: now,
+		}
+	case domain.StateFailed:
+		event = domain.PaymentFailed{
+			TransactionID: tx.ID, AgentID: tx.AgentID, Money: &monetaryAmount, Amount: tx.Amount,
+			Currency: tx.Currency, Reason: reason, OccurredAt: now,
+		}
+	case domain.StateUnknown:
+		event = domain.PaymentProcessingUncertain{
+			TransactionID: tx.ID, AgentID: tx.AgentID, Money: &monetaryAmount, Amount: tx.Amount,
+			Currency: tx.Currency, Reason: reason, OccurredAt: now,
+		}
+	default:
+		return "", nil, fmt.Errorf("unsupported payment result state %q", state)
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return "", nil, fmt.Errorf("marshal %s: %w", event.EventType(), err)
+	}
+	return event.EventType(), payload, nil
 }

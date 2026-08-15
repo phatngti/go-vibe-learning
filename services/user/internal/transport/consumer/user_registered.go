@@ -9,8 +9,8 @@ import (
 
 	"github/master_go_cqrs/internal/platform/eventstore"
 	"github/master_go_cqrs/internal/platform/observability/logger"
+	platformpostgres "github/master_go_cqrs/internal/platform/postgres"
 	"github/master_go_cqrs/services/user/internal/application/command"
-	"github/master_go_cqrs/services/user/internal/application/port"
 	"github/master_go_cqrs/services/user/internal/domain"
 
 	"go.uber.org/fx"
@@ -28,23 +28,22 @@ type batchConsumer interface {
 	ConsumeBatch(context.Context, string, string, []string, int, eventstore.BatchHandler) (int, error)
 }
 
-// UserRegisteredHandler processes UserRegistered domain events by fetching the
-// user from the identity provider and syncing them into the local database.
+// UserRegisteredHandler translates UserRegistered events into durable sync-job
+// intent. It performs no external I/O while the event consumer holds its
+// checkpoint transaction.
 type UserRegisteredHandler struct {
-	syncGw   port.SyncGateway
-	syncUser *command.SyncUsersHandler
-	logger   logger.Factory
+	requestSync *command.RequestUserSyncHandler
+	logger      logger.Factory
 }
 
 func NewUserRegisteredHandler(
-	syncGw port.SyncGateway,
-	syncUser *command.SyncUsersHandler,
+	requestSync *command.RequestUserSyncHandler,
 	logger logger.Factory,
 ) *UserRegisteredHandler {
-	return &UserRegisteredHandler{syncGw: syncGw, syncUser: syncUser, logger: logger}
+	return &UserRegisteredHandler{requestSync: requestSync, logger: logger}
 }
 
-func (h *UserRegisteredHandler) Handle(ctx context.Context, _ *gorm.DB, event *eventstore.DomainEvent) error {
+func (h *UserRegisteredHandler) Handle(ctx context.Context, tx *gorm.DB, event *eventstore.DomainEvent) error {
 	var evt domain.UserRegistered
 	if err := json.Unmarshal([]byte(event.Payload), &evt); err != nil {
 		return fmt.Errorf("decode UserRegistered event: %w", err)
@@ -53,23 +52,23 @@ func (h *UserRegisteredHandler) Handle(ctx context.Context, _ *gorm.DB, event *e
 	h.logger.For(ctx).Info("Processing UserRegistered event").WithFields(
 		zap.String("event_id", event.ID.String()),
 		zap.String("provider_user_id", evt.IdentityProviderUserID),
-		zap.String("email", evt.Email),
 	)
 
-	// Fetch the full user profile from the identity provider.
-	user, err := h.syncGw.FetchUserByID(ctx, evt.IdentityProviderUserID)
+	// The job insert uses the event consumer's transaction, making durable
+	// intent and checkpoint advancement atomic. A separate worker performs the
+	// Keycloak call only after this transaction commits.
+	txCtx := platformpostgres.WithTx(ctx, tx)
+	job, created, err := h.requestSync.EnqueueRegistered(
+		txCtx, event.ID.String(), evt.IdentityProviderUserID,
+	)
 	if err != nil {
-		return fmt.Errorf("fetch user %s from provider: %w", evt.IdentityProviderUserID, err)
+		return err
 	}
 
-	// Upsert the user into the local database and emit a UserSynced event.
-	if err := h.syncUser.SyncOne(ctx, user); err != nil {
-		return fmt.Errorf("sync user %s to local DB: %w", evt.IdentityProviderUserID, err)
-	}
-
-	h.logger.For(ctx).Info("User synced to local database").WithFields(
-		zap.String("user_id", user.ID),
-		zap.String("provider_user_id", user.IdentityProviderUserID),
+	h.logger.For(ctx).Info("User synchronization job persisted").WithFields(
+		zap.String("sync_job_id", job.ID),
+		zap.String("provider_user_id", evt.IdentityProviderUserID),
+		zap.Bool("created", created),
 	)
 	return nil
 }

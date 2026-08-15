@@ -1,5 +1,10 @@
 # Orchestrator Migrations
 
-The orchestrator service currently has no database tables.
+These migrations own the fallback PostgreSQL Saga runtime and its transactional
+inbox/outbox tables. Temporal mode stores Workflow history in Temporal; it does
+not use `payment_sagas`, but it still exchanges commands and events through the
+same Kafka contracts.
 
-Add orchestrator-owned migrations here if workflow persistence or projections are introduced later.
+Apply them when `ORCHESTRATOR_ENGINE=saga`. Keeping the schema available during
+a staged migration also permits rollback from Temporal to the fallback engine;
+never run both engines against the same production event stream at once.

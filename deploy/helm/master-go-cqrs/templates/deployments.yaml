@@ -1,0 +1,190 @@
+{{- range $name, $service := .Values.services }}
+{{- if $service.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "master-go-cqrs.serviceName" (dict "root" $ "name" $name) }}
+  labels:
+    {{- include "master-go-cqrs.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  replicas: {{ $service.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "master-go-cqrs.labels" $ | nindent 8 }}
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        {{- with $.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "master-go-cqrs.serviceAccountName" $ }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ $.Values.global.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if $.Values.global.topologySpread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ printf "%s@%s" $service.image.repository $service.image.digest | quote }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          {{- if or (gt (int $service.httpPort) 0) (gt (int $service.grpcPort) 0) }}
+          ports:
+            {{- if gt (int $service.httpPort) 0 }}
+            - name: http
+              containerPort: {{ $service.httpPort }}
+            {{- end }}
+            {{- if gt (int $service.grpcPort) 0 }}
+            - name: grpc
+              containerPort: {{ $service.grpcPort }}
+            {{- end }}
+          {{- end }}
+          env:
+            - {name: SERVICE_NAME, value: {{ $name | quote }}}
+            - {name: APP_ENV, value: {{ $.Values.global.environment | quote }}}
+            - {name: LOG_ENCODING, value: json}
+            - {name: CONFIG_PATH, value: {{ printf "%s/%s.yaml" $.Values.global.configDirectory $name | quote }}}
+            - {name: SERVER_ALLOWED_ORIGINS, value: {{ join "," $.Values.global.allowedOrigins | quote }}}
+            - {name: POSTGRES_HOST, value: {{ $.Values.global.postgres.host | quote }}}
+            - {name: POSTGRES_PORT, value: {{ $.Values.global.postgres.port | quote }}}
+            - {name: POSTGRES_SSL_MODE, value: {{ $.Values.global.postgres.sslMode | quote }}}
+            - {name: POSTGRES_SSL_ROOT_CERT, value: /var/run/secrets/postgres/ca.crt}
+            - name: POSTGRES_DBNAME
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-name" $service.databaseSecretPrefix }}}}
+            - name: POSTGRES_USER
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-user" $service.databaseSecretPrefix }}}}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-password" $service.databaseSecretPrefix }}}}
+            - {name: KAFKA_BROKERS, value: {{ $.Values.global.kafka.brokers | quote }}}
+            - {name: KAFKA_SERIALIZATION_FORMAT, value: {{ $.Values.global.kafka.serializationFormat | quote }}}
+            - {name: KAFKA_SCHEMA_REGISTRY_URL, value: {{ $.Values.global.kafka.schemaRegistryUrl | quote }}}
+            - {name: KAFKA_SCHEMA_REGISTRY_COMPATIBILITY, value: BACKWARD_TRANSITIVE}
+            - {name: KAFKA_TLS_ENABLED, value: "true"}
+            - {name: KAFKA_TLS_CA_FILE, value: /var/run/secrets/kafka/ca.crt}
+            - {name: KAFKA_TLS_SERVER_NAME, value: {{ $.Values.global.kafka.tls.serverName | quote }}}
+            - {name: KAFKA_SASL_MECHANISM, value: {{ $.Values.global.kafka.sasl.mechanism | quote }}}
+            - name: KAFKA_SASL_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-kafka-username" $service.kafkaSecretPrefix }}}}
+            - name: KAFKA_SASL_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-kafka-password" $service.kafkaSecretPrefix }}}}
+            - name: KAFKA_SCHEMA_REGISTRY_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-schema-registry-username" $service.kafkaSecretPrefix }}}}
+            - name: KAFKA_SCHEMA_REGISTRY_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: {{ printf "%s-schema-registry-password" $service.kafkaSecretPrefix }}}}
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: {{ $.Values.global.otel.endpoint | quote }}}
+            - {name: OTEL_SERVICE_NAME, value: {{ $name | quote }}}
+            {{- if ne $name "orchestrator" }}
+            - {name: AUTH_JWT_REQUIRED, value: "true"}
+            - {name: AUTH_JWT_ISSUER, value: {{ $.Values.global.keycloak.issuer | quote }}}
+            - {name: AUTH_JWT_AUDIENCE, value: {{ $.Values.global.keycloak.audience | quote }}}
+            - {name: AUTH_JWT_JWKS_URL, value: {{ $.Values.global.keycloak.jwksUrl | quote }}}
+            - {name: KEYCLOAK_ENDPOINT, value: {{ $.Values.global.keycloak.endpoint | quote }}}
+            - {name: KEYCLOAK_REALM, value: {{ $.Values.global.keycloak.realm | quote }}}
+            - {name: KEYCLOAK_CLIENT_ID, value: {{ $.Values.global.keycloak.clientId | quote }}}
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: keycloak-client-secret}}
+            {{- end }}
+            {{- if eq $name "orchestrator" }}
+            - {name: ORCHESTRATOR_ENGINE, value: temporal}
+            - {name: TEMPORAL_ADDRESS, value: {{ $.Values.global.temporal.address | quote }}}
+            - {name: TEMPORAL_NAMESPACE, value: {{ $.Values.global.temporal.namespace | quote }}}
+            - {name: TEMPORAL_TASK_QUEUE, value: {{ $.Values.global.temporal.taskQueue | quote }}}
+            {{- end }}
+            {{- if eq $name "payment" }}
+            - {name: PAYMENT_PROVIDER, value: stripe}
+            - {name: PAYMENT_LEGACY_RAW_CARD_ENABLED, value: "false"}
+            - name: STRIPE_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: stripe-secret-key}}
+            - name: STRIPE_WEBHOOK_SECRETS
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: stripe-webhook-secrets}}
+            {{- end }}
+            {{- if eq $name "agent" }}
+            - {name: CALLBACK_REQUIRE_HTTPS, value: "true"}
+            - {name: CALLBACK_REQUIRE_VERIFIED, value: "true"}
+            - {name: CALLBACK_SIGNING_KEY_VERSION, value: {{ $.Values.global.callback.signingKeyVersion | quote }}}
+            - {name: CALLBACK_VERIFIED_DOMAINS, value: {{ join "," $.Values.global.callback.verifiedDomains | quote }}}
+            - name: CALLBACK_SIGNING_SECRET
+              valueFrom: {secretKeyRef: {name: {{ $.Values.global.externalSecretName }}, key: callback-signing-secret}}
+            {{- end }}
+          {{- if gt (int $service.httpPort) 0 }}
+          startupProbe:
+            httpGet: {path: /api/v1/health/live, port: http}
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet: {path: /api/v1/health/live, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /api/v1/health/ready, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          {{- end }}
+          resources:
+            {{- toYaml $service.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: kafka-ca
+              mountPath: /var/run/secrets/kafka
+              readOnly: true
+            - name: postgres-ca
+              mountPath: /var/run/secrets/postgres
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: kafka-ca
+          secret:
+            secretName: {{ $.Values.global.externalSecretName }}
+            items:
+              - key: {{ $.Values.global.kafka.tls.caSecretKey }}
+                path: ca.crt
+        - name: postgres-ca
+          secret:
+            secretName: {{ $.Values.global.externalSecretName }}
+            items:
+              - key: {{ $.Values.global.postgres.caSecretKey }}
+                path: ca.crt
+{{- end }}
+{{- end }}

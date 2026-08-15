@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package payment.v2;
+
+import "google/api/annotations.proto";
+
+option go_package = "github/master_go_cqrs/contracts/genproto/paymentv2;paymentv2";
+
+// Money carries an integer amount together with the ISO 4217 metadata needed
+// to validate its scale. The exponent must match the configured currency.
+message Money {
+  int64 amount_minor = 1;
+  string currency = 2;
+  int32 exponent = 3;
+}
+
+message CreatePaymentRequest {
+  Money money = 1;
+  string customer_reference = 2;
+  string callback_endpoint_id = 3;
+  map<string, string> metadata = 4;
+}
+
+message CreatePaymentResponse {
+  string transaction_id = 1;
+  string provider = 2;
+  string client_secret = 3;
+  string status = 4;
+  Money money = 5;
+}
+
+message GetPaymentRequest {
+  string transaction_id = 1;
+}
+
+message GetPaymentResponse {
+  string transaction_id = 1;
+  string customer_reference = 2;
+  string callback_endpoint_id = 3;
+  string provider = 4;
+  string provider_reference = 5;
+  string provider_status = 6;
+  string status = 7;
+  Money money = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+service PaymentService {
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse) {
+    option (google.api.http) = {
+      post: "/api/v2/payments"
+      body: "*"
+    };
+  }
+
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {
+    option (google.api.http) = {
+      get: "/api/v2/payments/{transaction_id}"
+    };
+  }
+}

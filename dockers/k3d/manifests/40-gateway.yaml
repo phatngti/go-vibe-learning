@@ -109,6 +109,13 @@ spec:
             name: envoy-swagger
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-gateway
+  namespace: master-go-cqrs
+automountServiceAccountToken: false
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: api-gateway
@@ -140,6 +147,7 @@ spec:
         app.kubernetes.io/name: api-gateway
         app.kubernetes.io/part-of: master-go-cqrs
     spec:
+      serviceAccountName: api-gateway
       containers:
         - name: api-gateway
           image: envoyproxy/envoy:v1.32-latest
@@ -213,3 +221,64 @@ spec:
             host: api-gateway
             port:
               number: 8888
+---
+# The Agent configuration API carries callback destinations and signing
+# credentials. Require an authenticated mesh identity and admit only Envoy.
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: agent-strict-mtls
+  namespace: master-go-cqrs
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: agent-ingress
+  namespace: master-go-cqrs
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/master-go-cqrs/sa/api-gateway
+      to:
+        - operation:
+            ports:
+              - "9084"
+    - to:
+        - operation:
+            ports:
+              - "8084"
+            paths:
+              - /api/v1/health/live
+              - /api/v1/health/ready
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-default-deny-ingress
+  namespace: master-go-cqrs
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agent
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api-gateway
+      ports:
+        - protocol: TCP
+          port: 9084

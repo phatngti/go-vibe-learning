@@ -58,45 +58,71 @@ func (h *SyncUsersHandler) Handle(ctx context.Context) (int, error) {
 // within the same database transaction.
 func (h *SyncUsersHandler) SyncOne(ctx context.Context, user *domain.UserIdentity) error {
 	return h.uow.Do(ctx, func(txCtx context.Context) error {
-		if err := h.repo.Upsert(txCtx, user); err != nil {
-			return err
-		}
+		return h.syncOne(txCtx, user)
+	})
+}
 
-		evt := domain.UserSynced{
-			UserID:                 user.ID,
-			IdentityProvider:       user.IdentityProvider,
-			IdentityProviderUserID: user.IdentityProviderUserID,
-			Username:               user.Username,
-			EmailVerified:          user.EmailVerified,
-			Enabled:                user.Enabled,
-			OccurredAt:             time.Now(),
+// SyncBatch commits one bounded provider page and an optional durable-job
+// transition in the same local transaction. The provider call must happen
+// before this method is invoked; no external I/O is performed while the
+// transaction is open.
+func (h *SyncUsersHandler) SyncBatch(
+	ctx context.Context,
+	users []domain.UserIdentity,
+	after func(txCtx context.Context) error,
+) error {
+	return h.uow.Do(ctx, func(txCtx context.Context) error {
+		for i := range users {
+			if err := h.syncOne(txCtx, &users[i]); err != nil {
+				return fmt.Errorf("sync_users: user %s: %w", users[i].IdentityProviderUserID, err)
+			}
 		}
-		if user.Email != nil {
-			evt.Email = *user.Email
+		if after != nil {
+			return after(txCtx)
 		}
-		if user.FirstName != nil {
-			evt.FirstName = *user.FirstName
-		}
-		if user.LastName != nil {
-			evt.LastName = *user.LastName
-		}
+		return nil
+	})
+}
 
-		payload, err := json.Marshal(evt)
-		if err != nil {
-			return fmt.Errorf("sync_users: marshal event: %w", err)
-		}
+func (h *SyncUsersHandler) syncOne(txCtx context.Context, user *domain.UserIdentity) error {
+	if err := h.repo.Upsert(txCtx, user); err != nil {
+		return err
+	}
 
-		version, err := h.eventStore.NextVersion(ctx, nil, aggregateType, user.ID)
-		if err != nil {
-			return err
-		}
+	evt := domain.UserSynced{
+		UserID:                 user.ID,
+		IdentityProvider:       user.IdentityProvider,
+		IdentityProviderUserID: user.IdentityProviderUserID,
+		Username:               user.Username,
+		EmailVerified:          user.EmailVerified,
+		Enabled:                user.Enabled,
+		OccurredAt:             time.Now(),
+	}
+	if user.Email != nil {
+		evt.Email = *user.Email
+	}
+	if user.FirstName != nil {
+		evt.FirstName = *user.FirstName
+	}
+	if user.LastName != nil {
+		evt.LastName = *user.LastName
+	}
 
-		return h.eventStore.AppendEvent(ctx, nil, &eventstore.DomainEvent{
-			AggregateType: aggregateType,
-			AggregateID:   user.ID,
-			EventType:     evt.EventType(),
-			Payload:       string(payload),
-			Version:       version,
-		})
+	payload, err := json.Marshal(evt)
+	if err != nil {
+		return fmt.Errorf("sync_users: marshal event: %w", err)
+	}
+
+	version, err := h.eventStore.NextVersion(txCtx, nil, aggregateType, user.ID)
+	if err != nil {
+		return err
+	}
+
+	return h.eventStore.AppendEvent(txCtx, nil, &eventstore.DomainEvent{
+		AggregateType: aggregateType,
+		AggregateID:   user.ID,
+		EventType:     evt.EventType(),
+		Payload:       string(payload),
+		Version:       version,
 	})
 }

@@ -16,7 +16,7 @@ server:
 keycloak:
   endpoint: "http://keycloak.master-go-cqrs.svc.cluster.local:8080"
   clientId: "master-go-cqrs"
-  clientSecret: "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
+  clientSecret: "local-dev-client-secret-change-me"
   customHeaderName: "Authorization"
   realm: "backend"
 

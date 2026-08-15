@@ -6,12 +6,13 @@ package inbox
 import "time"
 
 type Message struct {
-	MessageID   string    `gorm:"type:text;primaryKey"`
-	Topic       string    `gorm:"type:text;not null"`
-	MessageType string    `gorm:"type:text;not null"`
-	Status      string    `gorm:"type:text;not null"`
-	CreatedAt   time.Time `gorm:"not null;default:now()"`
-	ProcessedAt *time.Time
+	ConsumerName string    `gorm:"type:text;primaryKey"`
+	MessageID    string    `gorm:"type:text;primaryKey"`
+	Topic        string    `gorm:"type:text;not null"`
+	MessageType  string    `gorm:"type:text;not null"`
+	Status       string    `gorm:"type:text;not null"`
+	CreatedAt    time.Time `gorm:"not null;default:now()"`
+	ProcessedAt  *time.Time
 }
 
 func (Message) TableName() string {

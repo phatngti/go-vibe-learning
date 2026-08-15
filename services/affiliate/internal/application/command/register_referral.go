@@ -32,17 +32,18 @@ func (h *RegisterReferralHandler) Handle(ctx context.Context, cmd *dto.RegisterR
 	}
 
 	err := h.db.Transaction(func(dbTx *gorm.DB) error {
-		if err := h.repo.SaveReferral(ctx, ref); err != nil {
+		txCtx := platformpostgres.WithTx(ctx, dbTx)
+		if err := h.repo.SaveReferral(txCtx, ref); err != nil {
 			return err
 		}
 
-		metrics, err := h.repo.GetMetrics(ctx, cmd.ReferrerID)
+		metrics, err := h.repo.GetMetrics(txCtx, cmd.ReferrerID)
 		if err != nil {
 			return err
 		}
 
 		metrics.ReferralCount++
-		if err := h.repo.SaveMetrics(ctx, metrics); err != nil {
+		if err := h.repo.SaveMetrics(txCtx, metrics); err != nil {
 			return err
 		}
 
@@ -56,11 +57,11 @@ func (h *RegisterReferralHandler) Handle(ctx context.Context, cmd *dto.RegisterR
 		if err != nil {
 			return fmt.Errorf("register_referral: marshal event: %w", err)
 		}
-		version, err := h.eventStore.NextVersion(ctx, dbTx, "Referral", cmd.RefereeID)
+		version, err := h.eventStore.NextVersion(txCtx, dbTx, "Referral", cmd.RefereeID)
 		if err != nil {
 			return err
 		}
-		return h.eventStore.AppendEvent(ctx, dbTx, &eventstore.DomainEvent{
+		return h.eventStore.AppendEvent(txCtx, dbTx, &eventstore.DomainEvent{
 			AggregateType: "Referral",
 			AggregateID:   cmd.RefereeID,
 			EventType:     evt.EventType(),

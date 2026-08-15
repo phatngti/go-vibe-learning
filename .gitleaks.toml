@@ -1,0 +1,17 @@
+title = "Master Go CQRS secret scanning"
+
+[extend]
+useDefault = true
+
+# Only deterministic credentials used by the disposable k3d development
+# environment are allowlisted. Production charts contain secretKeyRef entries
+# and never these values.
+[[allowlists]]
+description = "Known disposable local-development credential values"
+regexTarget = "match"
+regexes = [
+  '''master_go_cqrs_(user|payment|affiliate|settlement|agent|orchestrator|temporal|keycloak)_password''',
+  '''d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417''',
+  '''local-dev-client-secret-change-me''',
+  '''local-callback-signing-secret-32b'''
+]

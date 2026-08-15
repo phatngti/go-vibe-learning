@@ -27,16 +27,47 @@ func NewSyncGateway(client platformkeycloak.Client) port.SyncGateway {
 }
 
 func (g *SyncGateway) FetchAllUsers(ctx context.Context) ([]domain.UserIdentity, error) {
-	kcUsers, err := g.client.GetUsers(ctx, gocloak.GetUsersParams{})
+	const compatibilityPageSize = 200
+	users := make([]domain.UserIdentity, 0, compatibilityPageSize)
+	cursor := 0
+	for {
+		page, err := g.FetchUsersPage(ctx, cursor, compatibilityPageSize)
+		if err != nil {
+			return nil, fmt.Errorf("sync_gateway: fetch all users: %w", err)
+		}
+		users = append(users, page.Users...)
+		if page.Done {
+			return users, nil
+		}
+		if page.NextCursor <= cursor {
+			return nil, fmt.Errorf("sync_gateway: provider cursor did not advance from %d", cursor)
+		}
+		cursor = page.NextCursor
+	}
+}
+
+func (g *SyncGateway) FetchUsersPage(ctx context.Context, cursor, limit int) (port.UserSyncPage, error) {
+	if cursor < 0 {
+		return port.UserSyncPage{}, fmt.Errorf("sync_gateway: cursor cannot be negative")
+	}
+	if limit <= 0 || limit > 1000 {
+		return port.UserSyncPage{}, fmt.Errorf("sync_gateway: page size must be between 1 and 1000")
+	}
+
+	first := cursor
+	max := limit
+	kcUsers, err := g.client.GetUsers(ctx, gocloak.GetUsersParams{First: &first, Max: &max})
 	if err != nil {
-		return nil, fmt.Errorf("sync_gateway: fetch all users: %w", err)
+		return port.UserSyncPage{}, fmt.Errorf("sync_gateway: fetch users at cursor %d: %w", cursor, err)
 	}
 
 	users := make([]domain.UserIdentity, 0, len(kcUsers))
 	for _, kcu := range kcUsers {
 		users = append(users, mapKeycloakUser(kcu))
 	}
-	return users, nil
+	return port.UserSyncPage{
+		Users: users, NextCursor: cursor + len(users), Done: len(users) < limit,
+	}, nil
 }
 
 func (g *SyncGateway) FetchUserByID(ctx context.Context, providerUserID string) (*domain.UserIdentity, error) {

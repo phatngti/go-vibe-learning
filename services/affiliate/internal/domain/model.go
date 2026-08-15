@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	sharedmoney "github/master_go_cqrs/internal/shared/money"
+)
 
 // Rank represents an affiliate tier level.
 type Rank string
@@ -22,10 +26,11 @@ type Referral struct {
 
 // AgentMetric tracks an agent's accumulated volume and referral count.
 type AgentMetric struct {
-	AgentID           string
-	AccumulatedVolume float64
-	ReferralCount     int32
-	UpdatedAt         time.Time
+	AgentID                string
+	AccumulatedVolume      float64
+	AccumulatedVolumeMoney *sharedmoney.Money
+	ReferralCount          int32
+	UpdatedAt              time.Time
 }
 
 // AffiliateLevel tracks an agent's current rank.

@@ -77,9 +77,16 @@ spec:
               value: http://otel:4318
             - name: OTEL_SERVICE_NAME
               value: user
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/health/ready
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -171,9 +178,16 @@ spec:
               value: http://otel:4318
             - name: OTEL_SERVICE_NAME
               value: payment
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/health/ready
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -263,9 +277,16 @@ spec:
               value: http://otel:4318
             - name: OTEL_SERVICE_NAME
               value: affiliate
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/health/ready
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -355,13 +376,27 @@ spec:
               value: http://otel:4318
             - name: OTEL_SERVICE_NAME
               value: settlement
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/health/ready
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent
+  namespace: master-go-cqrs
+automountServiceAccountToken: false
 ---
 apiVersion: v1
 kind: Service
@@ -395,6 +430,7 @@ spec:
         app.kubernetes.io/name: agent
         app.kubernetes.io/part-of: master-go-cqrs
     spec:
+      serviceAccountName: agent
       containers:
         - name: agent
           image: master-go-cqrs/agent:local
@@ -441,15 +477,33 @@ spec:
               value: backend
             - name: KEYCLOAK_CUSTOM_HEADER_NAME
               value: Authorization
+            - name: CALLBACK_SIGNING_KEY_VERSION
+              value: local-v1
+            - name: CALLBACK_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: master-go-cqrs-secrets
+                  key: callback-signing-secret
+            - name: CALLBACK_REQUIRE_HTTPS
+              value: "false"
+            - name: CALLBACK_REQUIRE_VERIFIED
+              value: "false"
             - name: KAFKA_BROKERS
               value: kafka.master-go-cqrs.svc.cluster.local:9092
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel:4318
             - name: OTEL_SERVICE_NAME
               value: agent
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/health/ready
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10

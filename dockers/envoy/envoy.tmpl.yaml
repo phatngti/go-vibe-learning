@@ -48,6 +48,16 @@ static_resources:
                       routes:
 __ROUTES__
                 http_filters:
+                  # Never trust an identity payload supplied by the public
+                  # caller. jwt_authn writes a fresh value after verification.
+                  - name: envoy.filters.http.lua
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+                      default_source_code:
+                        inline_string: |
+                          function envoy_on_request(handle)
+                            handle:headers():remove("x-gateway-jwt-payload")
+                          end
                   - name: envoy.filters.http.jwt_authn
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
@@ -57,21 +67,18 @@ __ROUTES__
                           from_headers:
                             - name: Authorization
                               value_prefix: "Bearer "
-                          local_jwks:
-                            inline_string: |
-                              {
-                                "keys": [
-                                  {
-                                    "kty": "RSA",
-                                    "alg": "RS256",
-                                    "use": "sig",
-                                    "kid": "backend-realm-key",
-                                    "n": "7ruRllo31rW1z0FNSK4wHK-NeavcyT4-Hh4QSEyyoQTOth59_EuayTrSf8Dn8JJaWVq8aSYDQTJS3PyhwTC2so4eVNxvbYr_NeWXUN04sc1dk6MlA_391aHEIgi2pRb_bIbPFUUB710xE_fkSCkh3Hm_idIOIvN7Yq9V3b37bku0LVXx1VRAllnM3547fYhlFkHlBrysLWSXL7JmydJ1ZeQNhuTpyAYCvmowdukd2KMdk1Q2gOKxCmBUnmptFZz1G1UHYzhFI-pZluZgfecsG_6_MaO3-RCxJQ2A7LSQTijrKdyIuoKKjHOymR2w-r2y4NI02HN4B0RUHcJJRZeXtQ",
-                                    "e": "AQAB"
-                                  }
-                                ]
-                              }
-                          forward: false
+                          audiences:
+                            - __ENVOY_JWT_AUDIENCE__
+                          remote_jwks:
+                            http_uri:
+                              uri: __KEYCLOAK_JWKS_URI__
+                              cluster: keycloak
+                              timeout: 5s
+                            cache_duration: 300s
+                          # Services independently verify the retained bearer
+                          # token. The derived payload remains useful for
+                          # routing, but is never the sole production proof.
+                          forward: true
                           forward_payload_header: x-gateway-jwt-payload
                           payload_in_metadata: verified_jwt
                       rules:
@@ -88,6 +95,7 @@ __JWT_BYPASS_RULES__
                         path_prefix: /internal/ext-authz/check
                       allowed_headers:
                         patterns:
+                          - exact: authorization
                           - exact: x-gateway-jwt-payload
                           - exact: x-request-id
                           - exact: traceparent
@@ -98,6 +106,7 @@ __JWT_BYPASS_RULES__
                       proto_descriptor: /etc/envoy/proto.pb
                       services:
                         - payment.v1.PaymentService
+                        - payment.v2.PaymentService
                         - affiliate.v1.AffiliateService
                         - settlement.v1.SettlementService
                         - agent.v1.AgentConfigService
@@ -183,6 +192,19 @@ __JWT_BYPASS_RULES__
                     socket_address:
                       address: __PAYMENT_GRPC_ADDRESS__
                       port_value: __PAYMENT_GRPC_PORT__
+    - name: payment_http
+      type: LOGICAL_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: payment_http
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: __PAYMENT_HTTP_ADDRESS__
+                      port_value: __PAYMENT_HTTP_PORT__
     - name: affiliate_grpc
       type: LOGICAL_DNS
       connect_timeout: 5s

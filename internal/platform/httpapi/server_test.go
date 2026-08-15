@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +27,14 @@ func (testRegistrar) RegisterRoutes(group *echo.Group) {
 	group.GET("/test", func(c echo.Context) error { return c.NoContent(204) })
 }
 
+type testV2Registrar struct{}
+
+func (testV2Registrar) Pattern(*echo.Group) string { return "" }
+
+func (testV2Registrar) RegisterRoutes(group *echo.Group) {
+	group.GET("/test-v2", func(c echo.Context) error { return c.NoContent(204) })
+}
+
 func TestServerRoutes(t *testing.T) {
 	lifecycle := fxtest.NewLifecycle(t)
 	registrars := []route.Registrar{testRegistrar{}}
@@ -34,6 +44,7 @@ func TestServerRoutes(t *testing.T) {
 		Server:       new(config.Server),
 		LoggerConfig: new(config.Logger),
 		Routes:       registrars,
+		V2Routes:     []route.Registrar{testV2Registrar{}},
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
@@ -46,7 +57,10 @@ func TestServerRoutes(t *testing.T) {
 	expected := []string{
 		"GET /api/v1",
 		"GET /api/v1/health",
+		"GET /api/v1/health/live",
+		"GET /api/v1/health/ready",
 		"GET /api/v1/test",
+		"GET /api/v2/test-v2",
 		"GET /internal/ext-authz/check/*",
 	}
 
@@ -54,6 +68,24 @@ func TestServerRoutes(t *testing.T) {
 		if _, ok := routes[expectedRoute]; !ok {
 			t.Errorf("missing route %q", expectedRoute)
 		}
+	}
+}
+
+type readinessStub struct{ err error }
+
+func (s readinessStub) PingContext(context.Context) error { return s.err }
+
+func TestReadinessReflectsDependencyState(t *testing.T) {
+	server := &Server{echo: echo.New(), readiness: readinessStub{err: errors.New("database unavailable")}}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/health/ready", nil)
+	ctx := server.echo.NewContext(request, recorder)
+
+	if err := server.readinessCheck(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), "NOT_READY") {
+		t.Fatalf("readiness response = %d %s", recorder.Code, recorder.Body.String())
 	}
 }
 

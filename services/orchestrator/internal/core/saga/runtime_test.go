@@ -50,6 +50,8 @@ type eventProcessorStub struct {
 	calls int
 }
 
+func (*eventProcessorStub) Name() string { return "test-process" }
+
 func (*eventProcessorStub) TopicFor(string) string { return "process.events" }
 
 func (p *eventProcessorStub) ProcessEvent(context.Context, *gorm.DB, *kafka.Message) error {
@@ -86,8 +88,9 @@ func newCoreTestDB(t *testing.T) *gorm.DB {
 		t.Fatal(err)
 	}
 	if err := db.Exec(`CREATE TABLE public.inbox_messages (
-		message_id TEXT PRIMARY KEY, topic TEXT NOT NULL, message_type TEXT NOT NULL,
-		status TEXT NOT NULL, created_at DATETIME, processed_at DATETIME
+			consumer_name TEXT NOT NULL, message_id TEXT NOT NULL, topic TEXT NOT NULL, message_type TEXT NOT NULL,
+			status TEXT NOT NULL, created_at DATETIME, processed_at DATETIME,
+			PRIMARY KEY (consumer_name, message_id)
 	)`).Error; err != nil {
 		t.Fatal(err)
 	}

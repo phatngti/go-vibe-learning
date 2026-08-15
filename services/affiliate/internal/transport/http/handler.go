@@ -76,6 +76,11 @@ func (h *Handler) RegisterRoutes(g *echo.Group) {
 //	@Router			/affiliate/referral/link [post]
 func (h *Handler) LinkReferral(c echo.Context) error {
 	req := c.Get("dto").(*dto.RegisterReferral)
+	owner, err := gatewayauth.RequireAgentOwnership(c.Request().Context(), req.ReferrerID)
+	if err != nil {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+	}
+	req.ReferrerID = owner.AgentID
 
 	if err := h.registerReferral.Handle(c.Request().Context(), req); err != nil {
 		h.logger.For(c.Request().Context()).Error("%v", err.Error()).WithFields(zap.Error(err))
@@ -97,7 +102,11 @@ func (h *Handler) LinkReferral(c echo.Context) error {
 //	@Security		BearerAuth
 //	@Router			/affiliate/rank/{id} [get]
 func (h *Handler) GetRank(c echo.Context) error {
-	id := c.Param("id")
+	owner, err := gatewayauth.RequireAgentOwnership(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+	}
+	id := owner.AgentID
 	level, metrics, err := h.getRank.Handle(c.Request().Context(), id)
 	if err != nil {
 		h.logger.For(c.Request().Context()).Error("%v", err.Error()).WithFields(zap.Error(err))
@@ -107,6 +116,7 @@ func (h *Handler) GetRank(c echo.Context) error {
 	return c.JSON(http.StatusOK, dto.RankResponse{
 		AgentID:     level.AgentID,
 		CurrentRank: string(level.CurrentRank),
+		TotalMoney:  metrics.AccumulatedVolumeMoney,
 		TotalVolume: metrics.AccumulatedVolume,
 		Referrals:   metrics.ReferralCount,
 	})
@@ -124,7 +134,11 @@ func (h *Handler) GetRank(c echo.Context) error {
 //	@Security		BearerAuth
 //	@Router			/affiliate/downline/{id} [get]
 func (h *Handler) GetDownline(c echo.Context) error {
-	id := c.Param("id")
+	owner, err := gatewayauth.RequireAgentOwnership(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+	}
+	id := owner.AgentID
 	referees, err := h.getDownline.Handle(c.Request().Context(), id)
 	if err != nil {
 		h.logger.For(c.Request().Context()).Error("%v", err.Error()).WithFields(zap.Error(err))

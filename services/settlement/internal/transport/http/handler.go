@@ -74,7 +74,11 @@ func (h *Handler) RegisterRoutes(g *echo.Group) {
 //	@Security		BearerAuth
 //	@Router			/settlement/balance/{id} [get]
 func (h *Handler) GetBalance(c echo.Context) error {
-	id := c.Param("id")
+	owner, err := gatewayauth.RequireAgentOwnership(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+	}
+	id := owner.AgentID
 	bal, err := h.getBalance.Handle(c.Request().Context(), id)
 	if err != nil {
 		h.logger.For(c.Request().Context()).Error("%v", err.Error()).WithFields(zap.Error(err))
@@ -104,6 +108,11 @@ func (h *Handler) GetBalance(c echo.Context) error {
 //	@Router			/settlement/withdraw [post]
 func (h *Handler) RequestWithdrawal(c echo.Context) error {
 	req := c.Get("dto").(*dto.RequestWithdrawal)
+	owner, err := gatewayauth.RequireAgentOwnership(c.Request().Context(), req.AgentID)
+	if err != nil {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+	}
+	req.AgentID = owner.AgentID
 
 	bal, err := h.requestWithdrawal.Handle(c.Request().Context(), req)
 	if err != nil {
@@ -134,6 +143,11 @@ func (h *Handler) RequestWithdrawal(c echo.Context) error {
 //	@Router			/settlement/credit/limit [post]
 func (h *Handler) AdjustCreditLimit(c echo.Context) error {
 	req := c.Get("dto").(*dto.AdjustCreditLimit)
+	owner, err := gatewayauth.RequireAgentOwnership(c.Request().Context(), req.AgentID)
+	if err != nil {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+	}
+	req.AgentID = owner.AgentID
 
 	bal, err := h.adjustCreditLimit.Handle(c.Request().Context(), req)
 	if err != nil {

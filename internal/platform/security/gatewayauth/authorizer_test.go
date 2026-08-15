@@ -23,3 +23,18 @@ func TestRouteAuthorizer(t *testing.T) {
 		t.Fatal("Authorize() = true without required scope, want false")
 	}
 }
+
+func TestDefaultRouteAuthorizerProtectsPaymentV2(t *testing.T) {
+	authorizer := DefaultRouteAuthorizer()
+	user := User{ID: "user-1"}
+
+	if !authorizer.Authorize(http.MethodPost, "/api/v2/payments", user) {
+		t.Fatal("payment v2 creation must allow an authenticated principal")
+	}
+	if !authorizer.Authorize(http.MethodGet, "/api/v2/payments/tx-1", user) {
+		t.Fatal("payment v2 query must allow an authenticated principal")
+	}
+	if authorizer.Authorize(http.MethodGet, "/api/v2/payments", user) {
+		t.Fatal("payment v2 collection GET is not a public contract")
+	}
+}

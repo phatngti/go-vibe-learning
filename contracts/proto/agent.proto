@@ -16,6 +16,36 @@ message ConfigureCallbackResponse {
   string agent_id = 1;
   bool success = 2;
   string message = 3;
+  string callback_status = 4;
+  string challenge_id = 5;
+  string challenge_token = 6;
+  string challenge_proof_url = 7;
+  string challenge_expires_at = 8;
+}
+
+message VerifyCallbackRequest {
+  string agent_id = 1;
+  string challenge_id = 2;
+  string challenge_token = 3;
+}
+
+message VerifyCallbackResponse {
+  string agent_id = 1;
+  bool success = 2;
+  string callback_status = 3;
+  string callback_verified_at = 4;
+}
+
+message ReplayCallbackRequest {
+  string event_id = 1;
+  string reason = 2;
+}
+
+message ReplayCallbackResponse {
+  string event_id = 1;
+  string status = 2;
+  int64 outcome_generation = 3;
+  int32 replay_count = 4;
 }
 
 message GenerateApiKeyRequest {
@@ -51,6 +81,18 @@ service AgentConfigService {
   rpc ConfigureCallback(ConfigureCallbackRequest) returns (ConfigureCallbackResponse) {
     option (google.api.http) = {
       post: "/api/v1/agent/config/callback"
+      body: "*"
+    };
+  }
+  rpc VerifyCallback(VerifyCallbackRequest) returns (VerifyCallbackResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agent/config/callback/verify"
+      body: "*"
+    };
+  }
+  rpc ReplayCallback(ReplayCallbackRequest) returns (ReplayCallbackResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agent/callbacks/{event_id}/replay"
       body: "*"
     };
   }

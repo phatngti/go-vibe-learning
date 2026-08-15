@@ -33,6 +33,26 @@
       }
     ]
   },
+  "roles": {
+    "realm": [
+      {
+        "name": "tenant_member",
+        "description": "Access resources owned by the authenticated tenant"
+      },
+      {
+        "name": "tenant_admin",
+        "description": "Administer resources owned by the authenticated tenant"
+      },
+      {
+        "name": "finance_operator",
+        "description": "Operate tenant payment and settlement workflows"
+      },
+      {
+        "name": "platform_operator",
+        "description": "Operate the platform across tenants"
+      }
+    ]
+  },
   "clients": [
     {
       "clientId": "master-go-cqrs",
@@ -40,11 +60,58 @@
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
-      "secret": "d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417",
+      "secret": "local-dev-client-secret-change-me",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "master-go-cqrs-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "master-go-cqrs",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "tenant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "agent-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "agent_id",
+            "claim.name": "agent_id",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ],
       "redirectUris": [
         "*"
       ],
@@ -82,6 +149,17 @@
       "firstName": "Demo",
       "lastName": "User",
       "email": "demo@example.com",
+      "attributes": {
+        "tenant_id": [
+          "tenant-demo"
+        ],
+        "agent_id": [
+          "agent-demo"
+        ]
+      },
+      "realmRoles": [
+        "tenant_member"
+      ],
       "credentials": [
         {
           "type": "password",

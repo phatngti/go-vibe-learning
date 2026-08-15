@@ -34,10 +34,15 @@ spec:
                 sleep 2
               done
               for topic in \
+                payments.initiated \
                 payments.events \
                 affiliate.commands affiliate.events \
                 settlement.commands settlement.events \
-                agent.commands agent.events; do
+                agent.commands agent.events \
+                payments.initiated.dlq payments.events.dlq \
+                affiliate.commands.dlq affiliate.events.dlq \
+                settlement.commands.dlq settlement.events.dlq \
+                agent.commands.dlq agent.events.dlq; do
                 /opt/kafka/bin/kafka-topics.sh \
                   --bootstrap-server "$broker" \
                   --create --if-not-exists \

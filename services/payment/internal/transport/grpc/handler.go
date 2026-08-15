@@ -2,13 +2,16 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	paymentv1 "github/master_go_cqrs/contracts/genproto/payment"
+	"github/master_go_cqrs/internal/platform/security/gatewayauth"
 	"github/master_go_cqrs/services/payment/internal/application/command"
 	"github/master_go_cqrs/services/payment/internal/application/dto"
 	"github/master_go_cqrs/services/payment/internal/application/query"
 	"github/master_go_cqrs/services/payment/internal/config"
+	"github/master_go_cqrs/services/payment/internal/domain"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -21,6 +24,7 @@ type ServerHandler struct {
 	processPayment  *command.ProcessPaymentHandler
 	getTransaction  *query.GetTransactionHandler
 	publicBaseURL   string
+	allowRawCard    bool
 }
 
 func NewServerHandler(grpcServer *grpc.Server, cfg *config.Config, initiatePayment *command.InitiatePaymentHandler, processPayment *command.ProcessPaymentHandler, getTransaction *query.GetTransactionHandler) *ServerHandler {
@@ -33,6 +37,7 @@ func NewServerHandler(grpcServer *grpc.Server, cfg *config.Config, initiatePayme
 		processPayment:  processPayment,
 		getTransaction:  getTransaction,
 		publicBaseURL:   publicBaseURL,
+		allowRawCard:    cfg.RawCardEnabled(),
 	}
 	paymentv1.RegisterPaymentServiceServer(grpcServer, h)
 	return h
@@ -41,16 +46,27 @@ func NewServerHandler(grpcServer *grpc.Server, cfg *config.Config, initiatePayme
 func RequireServerHandler(*ServerHandler) {}
 
 func (h *ServerHandler) InitiatePayment(ctx context.Context, req *paymentv1.InitiatePaymentRequest) (*paymentv1.InitiatePaymentResponse, error) {
+	owner, err := gatewayauth.RequireAgentOwnership(ctx, req.AgentId)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
 	cmd := &dto.InitiatePayment{
-		AgentID:     req.AgentId,
-		Amount:      req.Amount,
-		Currency:    req.Currency,
-		CustomerID:  req.CustomerId,
-		CallbackURL: req.CallbackUrl,
+		AgentID:        owner.AgentID,
+		Amount:         req.Amount,
+		Currency:       req.Currency,
+		CustomerID:     req.CustomerId,
+		CallbackURL:    req.CallbackUrl,
+		IdempotencyKey: req.IdempotencyKey,
 	}
 
 	tx, err := h.initiatePayment.Handle(ctx, cmd)
 	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInitiationIdempotencyRequired):
+			return nil, status.Errorf(codes.InvalidArgument, "initiation idempotency key is required")
+		case errors.Is(err, domain.ErrInitiationIdempotencyConflict):
+			return nil, status.Errorf(codes.AlreadyExists, "initiation idempotency conflict: %v", err)
+		}
 		return nil, status.Errorf(codes.Internal, "failed to initiate payment: %v", err)
 	}
 
@@ -62,22 +78,34 @@ func (h *ServerHandler) InitiatePayment(ctx context.Context, req *paymentv1.Init
 }
 
 func (h *ServerHandler) ProcessPayment(ctx context.Context, req *paymentv1.ProcessPaymentRequest) (*paymentv1.ProcessPaymentResponse, error) {
+	if !h.allowRawCard {
+		return nil, status.Error(codes.Unimplemented, "legacy raw-card checkout is disabled")
+	}
 	cmd := &dto.ProcessPayment{
-		TransactionID: req.TransactionId,
-		PaymentMethod: req.PaymentMethod,
-		CardNumber:    req.CardNumber,
-		CVV:           req.Cvv,
+		TransactionID:  req.TransactionId,
+		PaymentMethod:  req.PaymentMethod,
+		CardNumber:     req.CardNumber,
+		CVV:            req.Cvv,
+		IdempotencyKey: req.IdempotencyKey,
 	}
 
 	tx, err := h.processPayment.Handle(ctx, cmd)
 	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrPaymentInProgress):
+			return nil, status.Errorf(codes.Aborted, "payment processing is already in progress: %v", err)
+		case errors.Is(err, domain.ErrIdempotencyConflict):
+			return nil, status.Errorf(codes.AlreadyExists, "payment idempotency conflict: %v", err)
+		case errors.Is(err, domain.ErrTransactionNotFound):
+			return nil, status.Errorf(codes.NotFound, "transaction not found: %v", err)
+		}
 		return nil, status.Errorf(codes.InvalidArgument, "failed to process payment: %v", err)
 	}
 
 	return &paymentv1.ProcessPaymentResponse{
 		TransactionId: tx.ID,
 		Status:        string(tx.Status),
-		Message:       "Transaction completed successfully",
+		Message:       "Payment processing result recorded",
 	}, nil
 }
 

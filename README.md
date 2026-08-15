@@ -38,7 +38,7 @@ Commands mutate state and own transactional work such as saving aggregates, writ
 
 ## Prerequisites
 
-- Go `1.24.4`
+- Go `1.25.13`
 - Task
 - Docker
 - Docker Compose, used only as a Dockerized k3d CLI fallback
@@ -73,9 +73,14 @@ The main config sections are:
 - `keycloak`: endpoint, client credentials, public key, auth header, and realm.
 - `gateway`: public API gateway values used by services, such as generated payment checkout links.
 - `otel`: OpenTelemetry OTLP HTTP endpoint and service name. Local configs send traces to the OpenTelemetry Collector at `localhost:4318`; the collector forwards them to Jaeger. Override with `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, or `OTEL_SERVICE_NAME` when needed.
+- `kafka`: brokers, topic contracts, bounded consumer retries, and optional TLS/mTLS/SASL security.
+- `outbox`: horizontally safe polling relay; disable it only after a CDC relay owns publication.
 - `orchestrator`: selects the process-wide payment orchestration engine. `saga` is the default; `temporal` uses the same Kafka contracts and shared payment process definition. Override with `ORCHESTRATOR_ENGINE`, `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, and `TEMPORAL_TASK_QUEUE`.
+- `reconciliation` (payment): provider outcome lookup for `UNKNOWN` and abandoned `PROCESSING` attempts.
 
 The payment process is defined once under `services/orchestrator/internal/payment`. Persistence-oriented Saga and Temporal workflow implementations are runtime adapters around that definition; feature logic does not inspect the selected engine.
+
+See the [documentation index](docs/README.md) for architecture decisions, system flows, production operations, incident runbooks, standards, and generated API contracts. The manifests under `dockers/k3d` remain development-only.
 
 ## Run Locally
 
@@ -177,7 +182,7 @@ Envoy is the public HTTP/JSON gateway for service gRPC APIs:
 client -> HTTP/JSON -> Envoy :8888 -> gRPC -> payment/affiliate/settlement/agent
 ```
 
-Gateway routes are generated from `google.api.http` proto annotations. The local gateway uses Envoy's gRPC-JSON transcoder and the generated descriptor at `dockers/envoy/proto.pb`; the gRPC gateway OpenAPI document is generated at `docs/envoy.swagger.json` and served by the gRPC Swagger UI at `/api/v1/docs/grpc/`.
+Gateway routes are generated from `google.api.http` proto annotations. The local gateway uses Envoy's gRPC-JSON transcoder and the generated descriptor at `dockers/envoy/proto.pb`; the gRPC gateway OpenAPI document is generated at `docs/api/envoy.swagger.json` and served by the gRPC Swagger UI at `/api/v1/docs/grpc/`.
 
 Envoy separates shared gateway behavior from environment-specific values:
 
@@ -429,7 +434,7 @@ curl -X POST \
   http://keycloak.master-go-cqrs.svc.cluster.local:8080/realms/backend/protocol/openid-connect/token \
   -d "grant_type=client_credentials" \
   -d "client_id=master-go-cqrs" \
-  -d "client_secret=d718f4676030aa7bc997227b38b13831ae2bbfea464bf276f97fdc602c82a417"
+  -d "client_secret=local-dev-client-secret-change-me"
 ```
 
 **Connect to Postgres for debugging:**

@@ -64,6 +64,22 @@ routes:
     public: true
 
   # ── Payment service ──
+  # Stripe signs the exact request bytes, so this endpoint intentionally uses
+  # the payment HTTP listener. It must never be mapped to a gRPC method.
+  - path: /api/v2/payments/webhooks/stripe
+    method: POST
+    cluster: payment_http
+    timeout: 15s
+    public: true
+
+  - path: /api/v2/payments
+    method: POST
+    cluster: payment_grpc
+
+  - prefix: /api/v2/payments/
+    method: GET
+    cluster: payment_grpc
+
   - path: /api/v1/payment/initiate
     method: POST
     cluster: payment_grpc
@@ -100,7 +116,15 @@ routes:
     method: POST
     cluster: agent_grpc
 
+  - path: /api/v1/agent/config/callback/verify
+    method: POST
+    cluster: agent_grpc
+
   - path: /api/v1/agent/config/key/generate
+    method: POST
+    cluster: agent_grpc
+
+  - prefix: /api/v1/agent/callbacks/
     method: POST
     cluster: agent_grpc
 

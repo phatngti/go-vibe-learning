@@ -23,8 +23,8 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.15.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.opentelemetry.io/otel/trace v1.44.0
-	go.temporal.io/api v1.62.12
-	go.temporal.io/sdk v1.44.1
+	go.temporal.io/api v1.63.4
+	go.temporal.io/sdk v1.47.0
 	go.temporal.io/sdk/contrib/opentelemetry v0.7.0
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.27.0
@@ -65,6 +65,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
+	github.com/nexus-rpc/nexus-proto-annotations v0.1.0 // indirect
 	github.com/nexus-rpc/sdk-go v0.6.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect

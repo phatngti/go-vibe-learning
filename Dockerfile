@@ -39,7 +39,7 @@ FROM builder AS builder-user
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/user ./cmd/user
 
 # Dedicated release artifact for one-shot, service-owned migration Jobs.
-FROM postgres:17-alpine AS migrations
+FROM postgres:18-alpine AS migrations
 COPY --chmod=0555 tools/migrate-up.sh /usr/local/bin/migrate-up
 COPY services/user/migrations/ /migrations/user/
 COPY services/payment/migrations/ /migrations/payment/

@@ -53,7 +53,7 @@ ENTRYPOINT ["/usr/local/bin/migrate-up"]
 # ==========================================
 # 2. Runtime Stage
 # ==========================================
-FROM alpine:3.21.3 AS runtime
+FROM alpine:3.24.3 AS runtime
 RUN apk add --no-cache ca-certificates tzdata \
     && addgroup -S -g 10001 app \
     && adduser -S -D -H -u 10001 -G app app \
